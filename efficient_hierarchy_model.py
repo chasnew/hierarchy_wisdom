@@ -13,27 +13,41 @@ class OpinionAgent(Agent):
     alpha: agent's influence that's translated into probability of speaking
     opinion: agent's opinion
     """
-    def __init__(self, unique_id, alpha, opinion, model):
+    def __init__(self, unique_id, alpha, opinion, model, w=0):
         super().__init__(unique_id, model)
         self.alpha = alpha # influence
         self.opinion = opinion
-        self.role = None
+        self.w = w
+
+    def __lt__(self, agent):
+        return self.alpha < agent.alpha
 
     def step(self):
         print(self.unique_id)
 
 class OpinionModel(Model):
-    """A model with opinion agents"""
+    """
+    A consensus building model with opinion agents that have different levels of influence
+
+    N: number of agents
+    x_threshold: threshold of standard variation of opinions under which the consensus-building is complete
+    k: exponent determining the mapping between influence and speaking probability
+    nlead: number of leaders (agents w/ high influence)
+    lead_alpha: leaders' influence
+    follw_alpha: followers' influence
+    lim_listeners: number of listeners
+    """
     def __init__(self, N, x_threshold, k, nlead, lead_alpha, follw_alpha, lim_listeners):
         self.num_agents = N
-        self.x_threshold = x_threshold # consensus threshold
-        self.k = k # exponent determining the mapping between influence and talk prob
-        self.nlead = nlead # number of leaders
-        self.lead_alpha = lead_alpha # leader's influence
-        self.follw_alpha = follw_alpha # followers' influence
-        self.lim_listeners = lim_listeners # number of listeners
+        self.x_threshold = x_threshold
+        self.k = k
+        self.nlead = nlead
+        self.lead_alpha = lead_alpha
+        self.follw_alpha = follw_alpha
+        self.lim_listeners = lim_listeners
+        self.n_event = 0
         self.schedule = RandomActivation(self)
-        # self.running = True
+        self.running = True
 
         # initialize population
         self.construct_population(self.nlead)
@@ -41,7 +55,8 @@ class OpinionModel(Model):
         # Define data collectors
         self.datacollector = DataCollector(
             model_reporters={'mean_opinion': self.mean_opinion,
-                             'sd_opinion': self.sd_opinion},
+                             'sd_opinion': self.sd_opinion,
+                             'n_event': 'n_event'},
             agent_reporters={'opinion': 'opinion'}
         )
 
@@ -76,7 +91,7 @@ class OpinionModel(Model):
     def step(self):
         self.datacollector.collect(self)
 
-        # select speaker and listeners
+        # compute speaking probability
         speak_probs = np.zeros(self.num_agents)
         speak_denom = 0
         for j, agent in enumerate(self.schedule.agents):
@@ -87,17 +102,32 @@ class OpinionModel(Model):
 
         pop_inds = np.arange(self.num_agents)
 
-        # make consensus
+        opi_sd = self.sd_opinion()
+        # print(opi_sd)
+        if opi_sd < self.x_threshold:
+            self.running = False
+
+        # select speaker
         speaker_ind = np.random.choice(pop_inds, p=speak_probs, size=1)[0]
         speaker = self.schedule.agents[speaker_ind]
 
+        # select listeners
         listener_inds = np.random.choice(pop_inds[pop_inds != speaker_ind],
                                          size=self.lim_listeners, replace=False)
 
         # update listeners' opinion
         for ind in listener_inds:
             listener = self.schedule.agents[ind]
-            print('listener id = ', listener.unique_id)
+
+            # calculate difference in influence
+            alpha_diff = speaker.alpha - listener.alpha
+            if alpha_diff <= 0:
+                alpha_diff = 0.01
+
+            # calculate difference in opinion
             opinion_diff = speaker.opinion - listener.opinion
-            listener.opinion = listener.opinion + (0.01 * opinion_diff)
-            print('listener opinion = ', listener.opinion)
+
+            # update opinion
+            listener.opinion = listener.opinion + (alpha_diff * opinion_diff)
+
+        self.n_event += 1

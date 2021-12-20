@@ -23,7 +23,8 @@ class OpinionAgent(Agent):
         return self.alpha < agent.alpha
 
     def step(self):
-        print(self.unique_id)
+        # activate to collect data
+        None
 
 class OpinionModel(Model):
     """
@@ -114,6 +115,8 @@ class OpinionModel(Model):
         # select listeners
         listener_inds = np.random.choice(pop_inds[pop_inds != speaker_ind],
                                          size=self.lim_listeners, replace=False)
+
+        # self.schedule.step() # activate to collect agent data
 
         # update listeners' opinion
         for ind in listener_inds:

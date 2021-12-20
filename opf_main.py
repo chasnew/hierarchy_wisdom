@@ -1,3 +1,4 @@
+import os
 from efficient_hierarchy_model import OpinionModel
 from mesa.batchrunner import BatchRunner
 
@@ -25,9 +26,18 @@ batch_run = BatchRunner(OpinionModel,
                         max_steps=1000,
                         model_reporters={'mean_opinion': lambda m: m.mean_opinion(),
                                          'sd_opinion': lambda m: m.sd_opinion(),
-                                         'n_event': lambda m: m.n_event}
+                                         'n_event': lambda m: m.n_event},
+                        agent_reporters={'opinion': 'opinion'}
                         )
 batch_run.run_all()
+
+# retrieve model-level results
 run_data = batch_run.get_model_vars_dataframe()
-print(run_data.info())
-print(run_data)
+# print(run_data.info())
+print(run_data['n_event'])
+run_data.to_csv(os.path.join('results', 'test.csv'), index=False)
+
+# data_collector_agents = batch_run.get_collector_agents()
+# agent_data = data_collector_agents[(50,1)]
+# print(agent_data.info())
+# print(agent_data)

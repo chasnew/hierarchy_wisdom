@@ -53,6 +53,9 @@ class OpinionModel(Model):
         # initialize population
         self.construct_population(self.nlead)
 
+        # pre-compute speaking probabilities
+        self.speak_probs = self.calc_talk_prob()
+
         # Define data collectors
         self.datacollector = DataCollector(
             model_reporters={'mean_opinion': self.mean_opinion,
@@ -82,6 +85,17 @@ class OpinionModel(Model):
             a = OpinionAgent(i, self.follw_alpha, opinion, self)
             self.schedule.add(a)
 
+    def calc_talk_prob(self):
+        speak_probs = np.zeros(self.num_agents)
+        speak_denom = 0
+        for j, agent in enumerate(self.schedule.agents):
+            speak_val = np.power(agent.alpha, self.k)
+            speak_probs[j] = speak_val
+            speak_denom += speak_val
+        speak_probs = speak_probs / speak_denom
+
+        return speak_probs
+
     def mean_opinion(self):
         return np.mean([agent.opinion for agent in self.schedule.agents])
 
@@ -92,15 +106,6 @@ class OpinionModel(Model):
     def step(self):
         self.datacollector.collect(self)
 
-        # compute speaking probability
-        speak_probs = np.zeros(self.num_agents)
-        speak_denom = 0
-        for j, agent in enumerate(self.schedule.agents):
-            speak_val = np.power(agent.alpha, self.k)
-            speak_probs[j] = speak_val
-            speak_denom += speak_val
-        speak_probs = speak_probs / speak_denom
-
         pop_inds = np.arange(self.num_agents)
 
         opi_sd = self.sd_opinion()
@@ -109,7 +114,7 @@ class OpinionModel(Model):
             self.running = False
 
         # select speaker
-        speaker_ind = np.random.choice(pop_inds, p=speak_probs, size=1)[0]
+        speaker_ind = np.random.choice(pop_inds, p=self.speak_probs, size=1)[0]
         speaker = self.schedule.agents[speaker_ind]
 
         # select listeners

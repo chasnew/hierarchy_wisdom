@@ -42,8 +42,9 @@ batch_run.run_all()
 # retrieve model-level results
 run_data = batch_run.get_model_vars_dataframe()
 print(run_data.info())
-run_data.to_csv(os.path.join(box_path, 'HierarchyWisdom', 'results', 'consensus_results.csv'), index=False, mode='a')
 
-# data_collector_agents = batch_run.get_collector_agents()
-# agent_data = data_collector_agents[(50,1)]
-# print(agent_data.info())
+result_file = os.path.join(box_path, 'HierarchyWisdom', 'results', 'consensus_results.csv')
+if os.path.exists(result_file):
+    run_data.to_csv(result_file, index=False, header=False, mode='a')
+else:
+    run_data.to_csv(result_file, index=False)

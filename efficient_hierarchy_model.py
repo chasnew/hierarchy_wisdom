@@ -24,7 +24,7 @@ class OpinionAgent(Agent):
 
     def step(self):
         # activate to collect data
-        None
+        pass
 
 class OpinionModel(Model):
     """
@@ -38,7 +38,8 @@ class OpinionModel(Model):
     follw_alpha: followers' influence
     lim_listeners: number of listeners
     """
-    def __init__(self, N, x_threshold, k, nlead, lead_alpha, follw_alpha, lim_listeners):
+    def __init__(self, N, x_threshold, k, nlead, lead_alpha,
+                 follw_alpha, lim_listeners, track_agents=False):
         self.num_agents = N
         self.x_threshold = x_threshold
         self.k = k
@@ -46,6 +47,7 @@ class OpinionModel(Model):
         self.lead_alpha = lead_alpha
         self.follw_alpha = follw_alpha
         self.lim_listeners = lim_listeners
+        self.track_agents = track_agents
         self.n_event = 0
         self.schedule = RandomActivation(self)
         self.running = True
@@ -121,7 +123,9 @@ class OpinionModel(Model):
         listener_inds = np.random.choice(pop_inds[pop_inds != speaker_ind],
                                          size=self.lim_listeners, replace=False)
 
-        # self.schedule.step() # activate to collect agent data
+        # activate to collect agent-level data
+        if self.track_agents:
+            self.schedule.step()
 
         # update listeners' opinion
         for ind in listener_inds:

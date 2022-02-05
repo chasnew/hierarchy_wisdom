@@ -29,15 +29,37 @@ class Community(Agent):
     x_threshold: consensus threshold
     k: exponent determining the mapping between influence and speaking probability
     lim_listeners: number of listeners per speaking event
+    K: carrying capacity for population growth equation
+    ra: intrinsic growth rate
+    gammar: steepness of growth rate induced by extra resources
+    betar: max increase in growth rate induced by extra resources
+    gammab: steepness of increase in benefit induced by participants
+    betab: max increase in benefit induced by number of participants
+    S: the benefit that will inherit to the next generation
+    b_mid: group size at the sigmoid's midpoint (sigmoid parameter)
+    Ct: time constraints on group consensus building
+    d: ecological inequality
     """
-    def __init__(self, unique_id, model, N, x_threshold, k, lim_listeners):
+    def __init__(self, unique_id, model, N, x_threshold, k, lim_listeners,
+                 K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, d):
         super().__init__(unique_id, model)
 
         self.N = N
         self.x_thresh = x_threshold
         self.k = k
         self.lim_listeners = lim_listeners
+        self.K = K
+        self.ra = ra
+        self.gammar = gammar
+        self.betar = betar
+        self.gammab = gammab
+        self.betab = betab
+        self.S = S
+        self.b_mid = b_mid
+        self.Ct = Ct
+        self.d = d
         self.n_event = 0
+        self.bt = 0 # additional resource produced by group
 
         # create a population of agents
         self.population = self.create_population()
@@ -52,6 +74,19 @@ class Community(Agent):
                                            opinion=np.random.rand()))
 
         return population
+
+    def reproduce(self):
+
+        offsprings = []
+
+        for agent in self.population:
+            # might need to adjust opinion to inheritance mode
+            offspring_tmp = [OpinionAgent(alpha=agent.alpha,
+                                          opinion=np.random.rand())
+                             for i in range(np.random.poisson(agent.w))]
+            offsprings.extend(offspring_tmp)
+
+        return offsprings
 
     def calc_talk_prob(self):
         speak_probs = np.zeros(self.N)
@@ -70,10 +105,18 @@ class Community(Agent):
     def sd_opinion(self):
         return np.std([agent.opinion for agent in self.population])
 
+    # Pearson’s moment coefficient of skewness
+    def influence_skewness(self):
+        alpha_array = np.array([agent.alpha for agent in self.population])
+        alpha_devs = alpha_array - np.mean(alpha_array)
+
+        return np.mean(np.power(alpha_devs, 3))/np.power(np.mean(alpha_devs), 3)
+
     def step(self):
 
         pop_inds = np.arange(len(self.population))
         opi_sd = self.sd_opinion()
+        init_opinions = np.array([agent.opinion for agent in self.population])
 
         self.n_event = 0
 
@@ -104,6 +147,28 @@ class Community(Agent):
 
             self.n_event += 1
 
+        # Calculate additional resource produced by the group (group-level payoff)
+        self.Bt = (self.Bt * self.S) +\
+                  (self.betab/(1 + np.power(np.e, -self.gammab*(self.N - self.b_mid)))) -\
+                  (self.Ct * self.n_event)
+
+        # Calculate the share of resources each individual receives
+        alphar = 1 - np.abs(init_opinions - self.mean_opinion())
+
+        pt = (1 + (self.d * alphar))
+        pt = pt/np.sum(pt)
+
+        # Calculate additional growth rate for each individual
+        rb = self.betar * (1 - np.power(np.e, -self.gammab * (self.Bt * pt)))
+
+        # Calculate fitness for each individual
+        w = (self.ra / (1 + (self.N/self.K))) + rb
+
+        for i, agent in enumerate(self.population):
+            agent.w = w[i]
+
+        # reproduction step
+        self.population = self.reproduce()
 
 
 class EvoOpinionModel(Model):
@@ -156,19 +221,19 @@ class EvoOpinionModel(Model):
             self.schedule.add(Community(self.init_n, self.x_threshold,
                                         self.k, self.lim_listeners))
 
-        # # Define data collectors
-        # self.datacollector = DataCollector(
-        #     model_reporters={'mean_opinion': self.mean_opinion,
-        #                      'sd_opinion': self.sd_opinion,
-        #                      'n_event': 'n_event'},
-        #     agent_reporters={'opinion': 'opinion'}
-        # )
+        # Define data collectors
+        self.datacollector = DataCollector(
+            agent_reporters={'n_event': self.n_event,
+                             'alpha_skewness': self.influence_skewness()}
+        )
 
     # Model time step
     def step(self):
         self.datacollector.collect(self)
 
-        Bt = np.zeros(self.np) # group additional benefit induced by more participants
-
         # activate consensus building for each community
         self.schedule.step()
+
+        # Migration (implement later)
+        # can add another attribute to the OpinionAgent
+

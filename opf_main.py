@@ -5,7 +5,7 @@ from mesa.batchrunner import BatchRunner, BatchRunnerMP
 box_path = '/Users/chanuwasaswamenakul/Library/CloudStorage/Box-Box'
 
 # need group size from 50 to 1000 (50 incremental step)
-variable_params = {'N': range(450, 501, 50),
+variable_params = {'N': range(50, 1001, 50),
                    'nlead': range(51)}
 fixed_params = {'x_threshold': 0.05,
                 'k': 4,

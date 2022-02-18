@@ -59,12 +59,12 @@ class OpinionModel(Model):
         self.speak_probs = self.calc_talk_prob()
 
         # Define data collectors
-        self.datacollector = DataCollector(
-            model_reporters={'mean_opinion': self.mean_opinion,
-                             'sd_opinion': self.sd_opinion,
-                             'n_event': 'n_event'},
-            agent_reporters={'opinion': 'opinion'}
-        )
+        # self.datacollector = DataCollector(
+        #     model_reporters={'mean_opinion': self.mean_opinion,
+        #                      'sd_opinion': self.sd_opinion,
+        #                      'n_event': 'n_event'},
+        #     agent_reporters={'opinion': 'opinion'}
+        # )
 
     def construct_population(self, nlead, random_leadx=True):
         x_max = 1
@@ -106,7 +106,7 @@ class OpinionModel(Model):
 
     # Model time step
     def step(self):
-        self.datacollector.collect(self)
+        # self.datacollector.collect(self)
 
         pop_inds = np.arange(self.num_agents)
 

@@ -5,8 +5,8 @@ from mesa.batchrunner import BatchRunner, BatchRunnerMP
 box_path = '/Users/chanuwasaswamenakul/Library/CloudStorage/Box-Box'
 
 # need group size from 50 to 1000 (50 incremental step)
-variable_params = {'N': range(50, 1001, 50),
-                   'nlead': range(51)}
+variable_params = {'N': range(50, 51, 50),
+                   'nlead': range(10)}
 fixed_params = {'x_threshold': 0.05,
                 'k': 4,
                 'lead_alpha': 0.75,
@@ -38,8 +38,8 @@ run_data.drop(columns=drop_cols, inplace=True)
 print(run_data.info())
 
 # save data
-result_file = os.path.join(box_path, 'HierarchyWisdom', 'results', 'consensus_results.csv')
-if os.path.exists(result_file):
-    run_data.to_csv(result_file, index=False, header=False, mode='a')
-else:
-    run_data.to_csv(result_file, index=False)
+# result_file = os.path.join(box_path, 'HierarchyWisdom', 'results', 'consensus_results.csv')
+# if os.path.exists(result_file):
+#     run_data.to_csv(result_file, index=False, header=False, mode='a')
+# else:
+#     run_data.to_csv(result_file, index=False)

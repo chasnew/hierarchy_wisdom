@@ -38,9 +38,12 @@ class OpinionModel(Model):
     follw_alpha: followers' influence
     lim_listeners: number of listeners
     update_coef: opinion updating coefficient, use difference in alpha if None
+    speak_prob: 'non-uniform' = calculate speaking probability based on alpha and k,
+                'uniform' = uniform speaking probability
     """
     def __init__(self, N, x_threshold, k, nlead, lead_alpha,
-                 follw_alpha, lim_listeners, update_coef=None, track_agents=False):
+                 follw_alpha, lim_listeners, update_coef=None,
+                 speak_prob='non-uniform', track_agents=False):
         self.num_agents = N
         self.x_threshold = x_threshold
         self.k = k
@@ -58,7 +61,8 @@ class OpinionModel(Model):
         self.construct_population(self.nlead)
 
         # pre-compute speaking probabilities
-        self.speak_probs = self.calc_talk_prob()
+        if speak_prob == 'non_uniform':
+            self.speak_probs = self.calc_talk_prob()
 
         # Define data collectors
         # self.datacollector = DataCollector(

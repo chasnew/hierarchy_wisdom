@@ -37,9 +37,10 @@ class OpinionModel(Model):
     lead_alpha: leaders' influence
     follw_alpha: followers' influence
     lim_listeners: number of listeners
+    update_coef: opinion updating coefficient, use difference in alpha if None
     """
     def __init__(self, N, x_threshold, k, nlead, lead_alpha,
-                 follw_alpha, lim_listeners, track_agents=False):
+                 follw_alpha, lim_listeners, update_coef=None, track_agents=False):
         self.num_agents = N
         self.x_threshold = x_threshold
         self.k = k
@@ -47,6 +48,7 @@ class OpinionModel(Model):
         self.lead_alpha = lead_alpha
         self.follw_alpha = follw_alpha
         self.lim_listeners = lim_listeners
+        self.update_coef = update_coef
         self.track_agents = track_agents
         self.n_event = 0
         self.schedule = RandomActivation(self)
@@ -106,7 +108,6 @@ class OpinionModel(Model):
 
     # Model time step
     def step(self):
-        # self.datacollector.collect(self)
 
         pop_inds = np.arange(self.num_agents)
 
@@ -131,15 +132,19 @@ class OpinionModel(Model):
         for ind in listener_inds:
             listener = self.schedule.agents[ind]
 
-            # calculate difference in influence
-            alpha_diff = speaker.alpha - listener.alpha
-            if alpha_diff <= 0:
-                alpha_diff = 0.01
+            # calculate opinion updating coefficient
+            if self.update_coef is None:
+                update_coef = speaker.alpha - listener.alpha
+
+                if update_coef <= 0:
+                    update_coef = 0.01
+            else:
+                update_coef = self.update_coef
 
             # calculate difference in opinion
             opinion_diff = speaker.opinion - listener.opinion
 
-            # update opinion
-            listener.opinion = listener.opinion + (alpha_diff * opinion_diff)
+            # update opinion (fixed updating coefficient replacing alpha_diff)
+            listener.opinion = listener.opinion + (update_coef * opinion_diff)
 
         self.n_event += 1

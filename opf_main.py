@@ -5,14 +5,14 @@ from mesa.batchrunner import BatchRunner, BatchRunnerMP
 box_path = '/Users/chanuwasaswamenakul/Library/CloudStorage/Box-Box'
 
 # need group size from 50 to 1000 (50 incremental step)
-variable_params = {'N': range(50, 301, 50),
+variable_params = {'N': range(50, 401, 50),
                    'nlead': range(51)}
 fixed_params = {'x_threshold': 0.05,
                 'k': 4,
                 'lead_alpha': 0.75,
                 'follw_alpha': 0.25,
                 'lim_listeners': 30,
-                'update_coef': 0.01,
+                'update_coef': None,
                 'speak_prob': 'uniform'}
 n_sim = 100 # number of simulations per parameter combination
 
@@ -40,7 +40,7 @@ run_data.drop(columns=drop_cols, inplace=True)
 print(run_data.info())
 
 # save data
-result_file = os.path.join(box_path, 'HierarchyWisdom', 'results', 'simplified_opf_results.csv')
+result_file = os.path.join(box_path, 'HierarchyWisdom', 'results', 'stubborn_opf_results.csv')
 if os.path.exists(result_file):
     run_data.to_csv(result_file, index=False, header=False, mode='a')
 else:

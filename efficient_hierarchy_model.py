@@ -63,6 +63,8 @@ class OpinionModel(Model):
         # pre-compute speaking probabilities
         if speak_prob == 'non_uniform':
             self.speak_probs = self.calc_talk_prob()
+        else:
+            self.speak_probs = np.ones(self.num_agents)/self.num_agents
 
         # Define data collectors
         # self.datacollector = DataCollector(

@@ -21,7 +21,7 @@ class OpinionAgent():
     def __lt__(self, agent):
         return self.alpha < agent.alpha
 
-class Community(Agent):
+class Community():
     """
     A community of opinion agents that try to reach a consensus to produce payoffs
 
@@ -42,10 +42,9 @@ class Community(Agent):
     """
     def __init__(self, unique_id, model, N, x_threshold, k, lim_listeners,
                  K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, d):
-        super().__init__(unique_id, model)
-
+        self.id = unique_id
         self.N = N
-        self.x_thresh = x_threshold
+        self.x_threshold = x_threshold
         self.k = k
         self.lim_listeners = lim_listeners
         self.K = K
@@ -59,7 +58,7 @@ class Community(Agent):
         self.Ct = Ct
         self.d = d
         self.n_event = 0
-        self.bt = 0 # additional resource produced by group
+        self.Bt = 0 # additional resource produced by group
 
         # create a population of agents
         self.population = self.create_population()
@@ -110,7 +109,7 @@ class Community(Agent):
         alpha_array = np.array([agent.alpha for agent in self.population])
         alpha_devs = alpha_array - np.mean(alpha_array)
 
-        return np.mean(np.power(alpha_devs, 3))/np.power(np.mean(alpha_devs), 3)
+        return np.mean(np.power(alpha_devs, 3))/np.power(np.std(alpha_array), 3)
 
     def step(self):
 
@@ -118,13 +117,13 @@ class Community(Agent):
         opi_sd = self.sd_opinion()
         init_opinions = np.array([agent.opinion for agent in self.population])
 
-        self.n_event = 0
+        # self.n_event = 0
 
-        while(opi_sd < self.x_threshold):
+        while(opi_sd > self.x_threshold):
 
             # select speaker
             speaker_ind = np.random.choice(pop_inds, p=self.speak_probs, size=1)[0]
-            speaker = self.schedule.agents[speaker_ind]
+            speaker = self.population[speaker_ind]
 
             # select listeners
             listener_inds = np.random.choice(pop_inds[pop_inds != speaker_ind],
@@ -132,7 +131,7 @@ class Community(Agent):
 
             # update listeners' opinion
             for ind in listener_inds:
-                listener = self.schedule.agents[ind]
+                listener = self.population[ind]
 
                 # calculate difference in influence
                 alpha_diff = speaker.alpha - listener.alpha
@@ -145,6 +144,7 @@ class Community(Agent):
                 # update opinion
                 listener.opinion = listener.opinion + (alpha_diff * opinion_diff)
 
+            opi_sd = self.sd_opinion()
             self.n_event += 1
 
         # Calculate additional resource produced by the group (group-level payoff)
@@ -170,8 +170,12 @@ class Community(Agent):
         # reproduction step
         self.population = self.reproduce()
 
+        # update population parameter
+        self.N = len(self.population)
+        self.speak_probs = self.calc_talk_prob()
 
-class EvoOpinionModel(Model):
+
+class EvoOpinionModel():
     """
     A consensus building model with opinion agents that have different levels of influence
 
@@ -193,9 +197,8 @@ class EvoOpinionModel(Model):
     Ct: time constraints on group consensus building
     d: ecological inequality
     """
-    def __init__(self, init_n, x_threshold, k, lead_alpha, follw_alpha, lim_listeners,
-                 np, mu, mu_var, K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, d,
-                 nlead=0, random_leadx=True):
+    def __init__(self, init_n, x_threshold, k, lim_listeners, np, mu, mu_var,
+                 K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, d):
         self.init_n = init_n
         self.x_threshold = x_threshold
         self.k = k
@@ -213,26 +216,50 @@ class EvoOpinionModel(Model):
         self.b_mid = b_mid
         self.Ct = Ct
         self.d = d
-        self.schedule = RandomActivation(self)
-        self.running = True
+        self.communities = set() # or list()
+        self.agent_reporter = {'group_id': lambda c: c.id,
+                               'n_event': lambda c: c.n_event,
+                               'group_size': lambda c: c.N,
+                               'alpha_skewness': lambda c: c.influence_skewness()}
+        self.datacollector = {key: [] for key in self.agent_reporter.keys()}
 
         # initialize communities
         for i in range(np):
-            self.schedule.add(Community(self.init_n, self.x_threshold,
-                                        self.k, self.lim_listeners))
+            self.communities.add(Community(unique_id=i,
+                                           model=self,
+                                           N=self.init_n,
+                                           x_threshold=self.x_threshold,
+                                           k=self.k,
+                                           lim_listeners=self.lim_listeners,
+                                           K=self.K,
+                                           ra=self.ra,
+                                           gammar=self.gammar,
+                                           betar=self.betar,
+                                           gammab=self.gammab,
+                                           betab=self.betab,
+                                           S=self.S,
+                                           b_mid=self.b_mid,
+                                           Ct=self.Ct,
+                                           d=self.d))
 
         # Define data collectors
-        self.datacollector = DataCollector(
-            agent_reporters={'n_event': self.n_event,
-                             'alpha_skewness': self.influence_skewness()}
-        )
+        # self.datacollector = DataCollector(
+        #     agent_reporters={'n_event': 'n_event'}
+        #                      'alpha_skewness': self.influence_skewness()}
+        # )
 
     # Model time step
-    def step(self):
-        self.datacollector.collect(self)
+    def step(self, verbose=False):
 
         # activate consensus building for each community
-        self.schedule.step()
+        for community in self.communities:
+            if verbose:
+                print('activating community', community.id)
+            community.step()
+
+        # reformat datacollector
+        for key, collect_func in self.agent_reporter.items():
+            self.datacollector[key].extend(list(map(collect_func, self.communities)))
 
         # Migration (implement later)
         # can add another attribute to the OpinionAgent

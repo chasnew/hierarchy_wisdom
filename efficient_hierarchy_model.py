@@ -66,14 +66,6 @@ class OpinionModel(Model):
         else:
             self.speak_probs = np.ones(self.num_agents)/self.num_agents
 
-        # Define data collectors
-        # self.datacollector = DataCollector(
-        #     model_reporters={'mean_opinion': self.mean_opinion,
-        #                      'sd_opinion': self.sd_opinion,
-        #                      'n_event': 'n_event'},
-        #     agent_reporters={'opinion': 'opinion'}
-        # )
-
     def construct_population(self, nlead, random_leadx=True):
         x_max = 1
 

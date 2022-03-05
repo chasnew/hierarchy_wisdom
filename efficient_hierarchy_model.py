@@ -31,19 +31,26 @@ class OpinionModel(Model):
     A consensus building model with opinion agents that have different levels of influence
 
     N: number of agents
-    x_threshold: threshold of standard variation of opinions under which the consensus-building is complete
+    x_threshold:
+        if criterion = 'sd_threshold' (default),
+        this value indicates the standard deviation of opinions under which the consensus-building is complete
+        if criterion = 'prop_threshold',
+        this value indicates the required proportion of opinions to fall on one side of the opinion continuum
+        if criterio = 'faction',
+        to be implemented
     k: exponent determining the mapping between influence and speaking probability
     nlead: number of leaders (agents w/ high influence)
     lead_alpha: leaders' influence
     follw_alpha: followers' influence
     lim_listeners: number of listeners
+    criterion: consensus criterion (default = 'sd_threshold')
     update_coef: opinion updating coefficient, use difference in alpha if None
     speak_prob: 'non-uniform' = calculate speaking probability based on alpha and k,
                 'uniform' = uniform speaking probability
     """
     def __init__(self, N, x_threshold, k, nlead, lead_alpha,
-                 follw_alpha, lim_listeners, update_coef=None,
-                 speak_prob='non-uniform', track_agents=False):
+                 follw_alpha, lim_listeners, criterion='sd_threshold',
+                 update_coef=None, speak_prob='non-uniform', track_agents=False):
         self.num_agents = N
         self.x_threshold = x_threshold
         self.k = k
@@ -51,6 +58,7 @@ class OpinionModel(Model):
         self.lead_alpha = lead_alpha
         self.follw_alpha = follw_alpha
         self.lim_listeners = lim_listeners
+        self.criterion = criterion
         self.update_coef = update_coef
         self.track_agents = track_agents
         self.n_event = 0
@@ -83,7 +91,7 @@ class OpinionModel(Model):
 
         # initialize followers
         for i in range(nlead, self.num_agents):
-            opinion = np.random.uniform(0, 1, size=1)
+            opinion = np.random.uniform(0, 1, size=1)[0]
             a = OpinionAgent(i, self.follw_alpha, opinion, self)
             self.schedule.add(a)
 
@@ -98,20 +106,34 @@ class OpinionModel(Model):
 
         return speak_probs
 
+    def check_consensus(self, criterion='sd_threshold'):
+        if criterion == 'sd_threshold':
+            opi_sd = self.sd_opinion()
+            return(opi_sd < self.x_threshold)
+        elif criterion == 'prop_threshold':
+            c_prop = self.choice_prop()
+            consensus_mask = (c_prop < 1 - self.x_threshold) | (c_prop > self.x_threshold)
+            return(consensus_mask)
+        elif criterion == 'faction':
+            return(True)
+
     def mean_opinion(self):
         return np.mean([agent.opinion for agent in self.schedule.agents])
 
     def sd_opinion(self):
         return np.std([agent.opinion for agent in self.schedule.agents])
 
+    def choice_prop(self):
+        opi_array = np.array([agent.opinion for agent in self.schedule.agents])
+        return np.mean(opi_array < 0.5)
+
     # Model time step
     def step(self):
 
         pop_inds = np.arange(self.num_agents)
 
-        opi_sd = self.sd_opinion()
-        # print(opi_sd)
-        if opi_sd < self.x_threshold:
+        consensus = self.check_consensus(self.criterion)
+        if consensus:
             self.running = False
 
         # select speaker

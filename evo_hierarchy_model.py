@@ -85,7 +85,12 @@ class Community():
                              for i in range(np.random.poisson(agent.w))]
             offsprings.extend(offspring_tmp)
 
-        return offsprings
+        # reproduction step
+        self.population = offsprings
+
+        # update population parameter
+        self.N = len(self.population)
+        self.speak_probs = self.calc_talk_prob()
 
     def calc_talk_prob(self):
         speak_probs = np.zeros(self.N)
@@ -104,6 +109,12 @@ class Community():
     def sd_opinion(self):
         return np.std([agent.opinion for agent in self.population])
 
+    def mean_fitness(self):
+        return np.mean([agent.w for agent in self.population])
+
+    def mean_influence(self):
+        return np.mean([agent.alpha for agent in self.population])
+
     # Pearson’s moment coefficient of skewness
     def influence_skewness(self):
         alpha_array = np.array([agent.alpha for agent in self.population])
@@ -111,7 +122,7 @@ class Community():
 
         return np.mean(np.power(alpha_devs, 3))/np.power(np.std(alpha_array), 3)
 
-    def step(self):
+    def make_decision(self):
 
         pop_inds = np.arange(len(self.population))
         opi_sd = self.sd_opinion()
@@ -149,7 +160,7 @@ class Community():
 
         # Calculate additional resource produced by the group (group-level payoff)
         self.Bt = (self.Bt * self.S) +\
-                  (self.betab/(1 + np.power(np.e, -self.gammab*(self.N - self.b_mid)))) -\
+                  (self.betab/(1 + np.exp(-self.gammab*(self.N - self.b_mid)))) -\
                   (self.Ct * self.n_event)
 
         # Calculate the share of resources each individual receives
@@ -159,20 +170,14 @@ class Community():
         pt = pt/np.sum(pt)
 
         # Calculate additional growth rate for each individual
-        rb = self.betar * (1 - np.power(np.e, -self.gammab * (self.Bt * pt)))
+        rb = self.betar * (1 - np.exp(-self.gammar * (self.Bt * pt)))
 
         # Calculate fitness for each individual
         w = (self.ra / (1 + (self.N/self.K))) + rb
+        w[ w < 0 ] = 0
 
         for i, agent in enumerate(self.population):
             agent.w = w[i]
-
-        # reproduction step
-        self.population = self.reproduce()
-
-        # update population parameter
-        self.N = len(self.population)
-        self.speak_probs = self.calc_talk_prob()
 
 
 class EvoOpinionModel():
@@ -216,12 +221,17 @@ class EvoOpinionModel():
         self.b_mid = b_mid
         self.Ct = Ct
         self.d = d
+        self.step_count = 0
         self.communities = set() # or list()
         self.agent_reporter = {'group_id': lambda c: c.id,
                                'n_event': lambda c: c.n_event,
                                'group_size': lambda c: c.N,
+                               'extra_resource': lambda c: c.Bt,
+                               'avg_alpha': lambda c: c.mean_influence(),
+                               'avg_fitness': lambda c: c.mean_fitness(),
                                'alpha_skewness': lambda c: c.influence_skewness()}
         self.datacollector = {key: [] for key in self.agent_reporter.keys()}
+        self.datacollector['step'] = []
 
         # initialize communities
         for i in range(np):
@@ -242,12 +252,6 @@ class EvoOpinionModel():
                                            Ct=self.Ct,
                                            d=self.d))
 
-        # Define data collectors
-        # self.datacollector = DataCollector(
-        #     agent_reporters={'n_event': 'n_event'}
-        #                      'alpha_skewness': self.influence_skewness()}
-        # )
-
     # Model time step
     def step(self, verbose=False):
 
@@ -255,11 +259,19 @@ class EvoOpinionModel():
         for community in self.communities:
             if verbose:
                 print('activating community', community.id)
-            community.step()
+            community.make_decision()
 
-        # reformat datacollector
+        self.step_count += 1
+
+        # collecting model results
         for key, collect_func in self.agent_reporter.items():
             self.datacollector[key].extend(list(map(collect_func, self.communities)))
+
+        self.datacollector['step'].extend([self.step_count] * self.np)
+
+        # Reproduction step
+        for community in self.communities:
+            community.reproduce()
 
         # Migration (implement later)
         # can add another attribute to the OpinionAgent

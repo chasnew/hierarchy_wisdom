@@ -1,9 +1,9 @@
 # Replication of efficient hierarchy model from https://doi.org/10.1098/rspb.2020.0693
 
 import numpy as np
-from mesa import Agent, Model
-from mesa.time import RandomActivation
-from mesa.datacollection import DataCollector
+from scipy.stats import truncnorm
+
+import multiprocessing as mp
 
 class OpinionAgent():
     """
@@ -29,6 +29,8 @@ class Community():
     x_threshold: consensus threshold
     k: exponent determining the mapping between influence and speaking probability
     lim_listeners: number of listeners per speaking event
+    mu_rate: mutation rate of influence value
+    alpha_var: variance of influence when mutation occurs
     K: carrying capacity for population growth equation
     ra: intrinsic growth rate
     gammar: steepness of growth rate induced by extra resources
@@ -41,12 +43,14 @@ class Community():
     d: ecological inequality
     """
     def __init__(self, unique_id, model, N, x_threshold, k, lim_listeners,
-                 K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, d):
+                 mu_rate, alpha_var, K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, d):
         self.id = unique_id
         self.N = N
         self.x_threshold = x_threshold
         self.k = k
         self.lim_listeners = lim_listeners
+        self.mu_rate = mu_rate
+        self.alpha_var = alpha_var
         self.K = K
         self.ra = ra
         self.gammar = gammar
@@ -80,9 +84,21 @@ class Community():
 
         for agent in self.population:
             # might need to adjust opinion to inheritance mode
-            offspring_tmp = [OpinionAgent(alpha=agent.alpha,
+            o_n = np.random.poisson(agent.w)
+
+            # randomize mutation
+            mutation_masks = np.random.choice([0,1], p=[1-self.mu_rate, self.mu_rate], size=o_n)
+
+            # adjusted truncated thresholds
+            a, b = (0 - agent.opinion) / self.alpha_var, (1 - agent.opinion) / self.alpha_var
+
+            # mutated alpha values
+            o_alphas = truncnorm.rvs(a , b, loc=agent.opinion, scale=self.alpha_var, size=o_n)
+            o_alphas = [agent.alpha if mutation_masks[i] else o_alphas[i] for i in range(o_n)]
+
+            offspring_tmp = [OpinionAgent(alpha=o_alphas[i],
                                           opinion=np.random.rand())
-                             for i in range(np.random.poisson(agent.w))]
+                             for i in range(o_n)]
             offsprings.extend(offspring_tmp)
 
         # reproduction step
@@ -189,8 +205,8 @@ class EvoOpinionModel():
     k: exponent determining the mapping between influence and speaking probability
     lim_listeners: number of listeners per speaking event
     np: number of community patches
-    mu: mutation rate of influence value
-    mu_var: variance of mutation rate
+    mu_rate: mutation rate of influence value
+    alpha_var: variance of influence when mutation occurs
     K: carrying capacity for population growth equation
     ra: intrinsic growth rate
     gammar: steepness of growth rate induced by extra resources
@@ -202,15 +218,15 @@ class EvoOpinionModel():
     Ct: time constraints on group consensus building
     d: ecological inequality
     """
-    def __init__(self, init_n, x_threshold, k, lim_listeners, np, mu, mu_var,
+    def __init__(self, init_n, x_threshold, k, lim_listeners, np, mu_rate, alpha_var,
                  K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, d):
         self.init_n = init_n
         self.x_threshold = x_threshold
         self.k = k
         self.lim_listeners = lim_listeners
         self.np = np
-        self.mu = mu
-        self.mu_var = mu_var
+        self.mu_rate = mu_rate
+        self.alpha_var = alpha_var
         self.K = K
         self.ra = ra
         self.gammar = gammar
@@ -228,19 +244,20 @@ class EvoOpinionModel():
                                'group_size': lambda c: c.N,
                                'extra_resource': lambda c: c.Bt,
                                'avg_alpha': lambda c: c.mean_influence(),
-                               'avg_fitness': lambda c: c.mean_fitness(),
                                'alpha_skewness': lambda c: c.influence_skewness()}
         self.datacollector = {key: [] for key in self.agent_reporter.keys()}
         self.datacollector['step'] = []
 
         # initialize communities
-        for i in range(np):
+        for i in range(self.np):
             self.communities.add(Community(unique_id=i,
                                            model=self,
                                            N=self.init_n,
                                            x_threshold=self.x_threshold,
                                            k=self.k,
                                            lim_listeners=self.lim_listeners,
+                                           mu_rate=self.mu_rate,
+                                           alpha_var=self.alpha_var,
                                            K=self.K,
                                            ra=self.ra,
                                            gammar=self.gammar,
@@ -253,13 +270,24 @@ class EvoOpinionModel():
                                            d=self.d))
 
     # Model time step
-    def step(self, verbose=False):
+    def step(self, verbose=False, process_num=1):
+
+        # initiate multicore-processing pool
+        if process_num == -1:
+            process_num = mp.cpu_count()
+            pool = mp.Pool(processes=process_num)
+        elif process_num > 1:
+            pool = mp.Pool(processes=process_num)
 
         # activate consensus building for each community
-        for community in self.communities:
-            if verbose:
-                print('activating community', community.id)
-            community.make_decision()
+        if process_num == 1:
+            for community in self.communities:
+                if verbose:
+                    print('activating community', community.id)
+                community.make_decision()
+        else:
+            for community in self.communities:
+                pool.apply_async(community.make_decision())
 
         self.step_count += 1
 
@@ -270,9 +298,15 @@ class EvoOpinionModel():
         self.datacollector['step'].extend([self.step_count] * self.np)
 
         # Reproduction step
-        for community in self.communities:
-            community.reproduce()
+        if process_num == 1:
+            for community in self.communities:
+                community.reproduce()
+        else:
+            for community in self.communities:
+                pool.apply_async(community.reproduce())
 
-        # Migration (implement later)
-        # can add another attribute to the OpinionAgent
+        if process_num > 1:
+            pool.close()
+
+        # Migration
 

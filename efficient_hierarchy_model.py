@@ -81,7 +81,7 @@ class OpinionModel(Model):
         for i in range(nlead):
             if random_leadx:
                 # randomize leaders' opinion [0,1]
-                a = OpinionAgent(i, self.lead_alpha, np.random.rand()*x_max, self)
+                a = OpinionAgent(i, self.lead_alpha, np.random.rand(), self)
                 self.schedule.add(a)
             else:
                 # evenly spaced leaders' opinion
@@ -91,7 +91,7 @@ class OpinionModel(Model):
 
         # initialize followers
         for i in range(nlead, self.num_agents):
-            opinion = np.random.uniform(0, 1, size=1)[0]
+            opinion = np.random.rand() # uniform distribution [0,1]
             a = OpinionAgent(i, self.follw_alpha, opinion, self)
             self.schedule.add(a)
 
@@ -115,6 +115,8 @@ class OpinionModel(Model):
             consensus_mask = (c_prop < 1 - self.x_threshold) | (c_prop > self.x_threshold)
             return(consensus_mask)
         elif criterion == 'faction':
+            opinion_array = np.array([agent.opinion for agent in self.schedule.agents])
+
             return(True)
 
     def mean_opinion(self):

@@ -217,9 +217,10 @@ class EvoOpinionModel():
     b_mid: group size at the sigmoid's midpoint (sigmoid parameter)
     Ct: time constraints on group consensus building
     d: ecological inequality
+    m: migration rate
     """
     def __init__(self, init_n, x_threshold, k, lim_listeners, np, mu_rate, alpha_var,
-                 K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, d):
+                 K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, d, m):
         self.init_n = init_n
         self.x_threshold = x_threshold
         self.k = k
@@ -237,6 +238,7 @@ class EvoOpinionModel():
         self.b_mid = b_mid
         self.Ct = Ct
         self.d = d
+        self.m = m
         self.step_count = 0
         self.communities = set() # or list()
         self.agent_reporter = {'group_id': lambda c: c.id,
@@ -308,5 +310,22 @@ class EvoOpinionModel():
         if process_num > 1:
             pool.close()
 
-        # Migration
+        # Migration step
+        if self.np > 1 and self.m is not None:
+            c_migrants = []
 
+            ## sample migrants
+            for i in range(self.np):
+                community = self.communities[i]
+                pop_ids = np.arange(len(community.population))
+                m_masks = np.random.binomial(size=pop_ids.shape[0], n=1, p=self.m)
+                m_ids = pop_ids[m_masks == 1]
+                c_migrants.append(community.population.pop(m_id) for m_id in reversed(m_ids))
+
+            ## assign patches
+            c_ids = np.arange(self.np)
+            for i in range(self.np):
+                new_c_ids = np.random.choice(c_ids[c_ids != i], size=len(c_migrants[i]), replace=True)
+
+                for c_id in new_c_ids:
+                    self.communities[c_id].population.append(c_migrants[i].pop(0))

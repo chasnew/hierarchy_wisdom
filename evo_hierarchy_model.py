@@ -144,7 +144,7 @@ class Community():
         opi_sd = self.sd_opinion()
         init_opinions = np.array([agent.opinion for agent in self.population])
 
-        # self.n_event = 0
+        self.n_event = 0
 
         while(opi_sd > self.x_threshold):
 

@@ -93,7 +93,7 @@ class Community():
             a, b = (0 - agent.opinion) / self.alpha_var, (1 - agent.opinion) / self.alpha_var
 
             # mutated alpha values
-            o_alphas = truncnorm.rvs(a , b, loc=agent.opinion, scale=self.alpha_var, size=o_n)
+            o_alphas = truncnorm.rvs(a , b, loc=agent.alpha, scale=self.alpha_var, size=o_n)
             o_alphas = [agent.alpha if mutation_masks[i] else o_alphas[i] for i in range(o_n)]
 
             offspring_tmp = [OpinionAgent(alpha=o_alphas[i],

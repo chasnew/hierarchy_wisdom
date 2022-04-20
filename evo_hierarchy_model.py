@@ -2,7 +2,7 @@
 
 import numpy as np
 from scipy.stats import truncnorm
-
+import pickle
 import multiprocessing as mp
 
 class OpinionAgent():
@@ -67,9 +67,6 @@ class Community():
         # create a population of agents
         self.population = self.create_population()
 
-        # pre-compute speaking probabilities
-        self.speak_probs = self.calc_talk_prob()
-
     def create_population(self):
         population = []
         for i in range(self.N):
@@ -94,7 +91,7 @@ class Community():
 
             # mutated alpha values
             o_alphas = truncnorm.rvs(a , b, loc=agent.alpha, scale=self.alpha_var, size=o_n)
-            o_alphas = [agent.alpha if mutation_masks[i] else o_alphas[i] for i in range(o_n)]
+            o_alphas = [agent.alpha if mutation_masks[i] == 0 else o_alphas[i] for i in range(o_n)]
 
             offspring_tmp = [OpinionAgent(alpha=o_alphas[i],
                                           opinion=np.random.rand())
@@ -106,7 +103,6 @@ class Community():
 
         # update population parameter
         self.N = len(self.population)
-        self.speak_probs = self.calc_talk_prob()
 
     def calc_talk_prob(self):
         speak_probs = np.zeros(self.N)
@@ -139,6 +135,8 @@ class Community():
         return np.mean(np.power(alpha_devs, 3))/np.power(np.std(alpha_array), 3)
 
     def make_decision(self):
+
+        self.speak_probs = self.calc_talk_prob()
 
         pop_inds = np.arange(len(self.population))
         opi_sd = self.sd_opinion()
@@ -218,9 +216,12 @@ class EvoOpinionModel():
     Ct: time constraints on group consensus building
     d: ecological inequality
     m: migration rate
+    load_communities: a set of communities provided to the model in a scenario
+        where user wants to resume the simulation
     """
     def __init__(self, init_n, x_threshold, k, lim_listeners, np, mu_rate, alpha_var,
-                 K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, d, m):
+                 K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, d, m,
+                 load_communities=None):
         self.init_n = init_n
         self.x_threshold = x_threshold
         self.k = k
@@ -245,31 +246,35 @@ class EvoOpinionModel():
                                'n_event': lambda c: c.n_event,
                                'group_size': lambda c: c.N,
                                'extra_resource': lambda c: c.Bt,
+                               'avg_fitness': lambda c: c.mean_fitness(),
                                'avg_alpha': lambda c: c.mean_influence(),
                                'alpha_skewness': lambda c: c.influence_skewness()}
         self.datacollector = {key: [] for key in self.agent_reporter.keys()}
         self.datacollector['step'] = []
 
         # initialize communities
-        for i in range(self.np):
-            self.communities.add(Community(unique_id=i,
-                                           model=self,
-                                           N=self.init_n,
-                                           x_threshold=self.x_threshold,
-                                           k=self.k,
-                                           lim_listeners=self.lim_listeners,
-                                           mu_rate=self.mu_rate,
-                                           alpha_var=self.alpha_var,
-                                           K=self.K,
-                                           ra=self.ra,
-                                           gammar=self.gammar,
-                                           betar=self.betar,
-                                           gammab=self.gammab,
-                                           betab=self.betab,
-                                           S=self.S,
-                                           b_mid=self.b_mid,
-                                           Ct=self.Ct,
-                                           d=self.d))
+        if load_communities is not None:
+            self.communities = load_communities
+        else:
+            for i in range(self.np):
+                self.communities.add(Community(unique_id=i,
+                                               model=self,
+                                               N=self.init_n,
+                                               x_threshold=self.x_threshold,
+                                               k=self.k,
+                                               lim_listeners=self.lim_listeners,
+                                               mu_rate=self.mu_rate,
+                                               alpha_var=self.alpha_var,
+                                               K=self.K,
+                                               ra=self.ra,
+                                               gammar=self.gammar,
+                                               betar=self.betar,
+                                               gammab=self.gammab,
+                                               betab=self.betab,
+                                               S=self.S,
+                                               b_mid=self.b_mid,
+                                               Ct=self.Ct,
+                                               d=self.d))
 
     # Model time step
     def step(self, verbose=False, process_num=1):
@@ -310,17 +315,21 @@ class EvoOpinionModel():
         if process_num > 1:
             pool.close()
 
+        # for c in self.communities:
+        #     print('community', c.id, ': ', c.N)
+
         # Migration step
         if self.np > 1 and self.m is not None:
+            list_com = list(self.communities)
             c_migrants = []
 
             ## sample migrants
             for i in range(self.np):
-                community = self.communities[i]
+                community = list_com[i]
                 pop_ids = np.arange(len(community.population))
                 m_masks = np.random.binomial(size=pop_ids.shape[0], n=1, p=self.m)
                 m_ids = pop_ids[m_masks == 1]
-                c_migrants.append(community.population.pop(m_id) for m_id in reversed(m_ids))
+                c_migrants.append([community.population.pop(m_id) for m_id in reversed(m_ids)])
 
             ## assign patches
             c_ids = np.arange(self.np)
@@ -328,4 +337,15 @@ class EvoOpinionModel():
                 new_c_ids = np.random.choice(c_ids[c_ids != i], size=len(c_migrants[i]), replace=True)
 
                 for c_id in new_c_ids:
-                    self.communities[c_id].population.append(c_migrants[i].pop(0))
+                    list_com[c_id].population.append(c_migrants[i].pop(0))
+
+            ## update group size
+            for c in self.communities:
+                c.N = len(c.population)
+
+        # for c in self.communities:
+        #     print('community', c.id, ': ', c.N)
+
+    def save_communities(self, filepath):
+        with open(filepath, 'wb') as file:
+            pickle.dump(self.communities, file)

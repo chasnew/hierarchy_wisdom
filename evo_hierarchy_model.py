@@ -173,9 +173,10 @@ class Community():
             self.n_event += 1
 
         # Calculate additional resource produced by the group (group-level payoff)
-        self.Bt = (self.Bt * self.S) +\
-                  (self.betab/(1 + np.exp(-self.gammab*(self.N - self.b_mid)))) -\
+        prev_Bt = self.Bt
+        self.Bt = (self.betab/(1 + np.exp(-self.gammab*(self.N - self.b_mid)))) -\
                   (self.Ct * self.n_event)
+        self.Bt = max(0, self.Bt)
 
         # Calculate the share of resources each individual receives
         alphar = 1 - np.abs(init_opinions - self.mean_opinion())
@@ -184,7 +185,7 @@ class Community():
         pt = pt/np.sum(pt)
 
         # Calculate additional growth rate for each individual
-        rb = self.betar * (1 - np.exp(-self.gammar * (self.Bt * pt)))
+        rb = self.betar * (1 - np.exp(-self.gammar * ((self.Bt + (self.S * prev_Bt)) * pt)))
 
         # Calculate fitness for each individual
         w = (self.ra / (1 + (self.N/self.K))) + rb

@@ -17,7 +17,7 @@ alpha_array = np.load(alpha_path)
 cum_alpha = alpha_array.cumsum(axis=1)
 
 # create a heatmap to replicate figure 2
-alpha_bins = np.linspace(0, 1, num=100)
+alpha_bins = np.linspace(0, 1, num=alpha_array.shape[1])
 prop_bins = np.linspace(0, 1, num=250)
 heatmap_array = []
 for alpha_row in cum_alpha:

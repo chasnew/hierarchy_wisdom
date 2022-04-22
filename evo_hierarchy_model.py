@@ -246,8 +246,8 @@ class EvoOpinionModel():
         self.agent_reporter = {'group_id': lambda c: c.id,
                                'n_event': lambda c: c.n_event,
                                'group_size': lambda c: c.N,
-                               'extra_resource': lambda c: c.Bt,
-                               'avg_fitness': lambda c: c.mean_fitness(),
+                               # 'extra_resource': lambda c: c.Bt,
+                               # 'avg_fitness': lambda c: c.mean_fitness(),
                                'avg_alpha': lambda c: c.mean_influence(),
                                'alpha_skewness': lambda c: c.influence_skewness()}
         self.datacollector = {key: [] for key in self.agent_reporter.keys()}

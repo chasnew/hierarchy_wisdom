@@ -4,8 +4,10 @@ import statsmodels.formula.api as smf
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+plt.style.use('seaborn')
+
 box_path = '/Users/chanuwasaswamenakul/Library/CloudStorage/Box-Box'
-result_path = os.path.join(box_path, 'HierarchyWisdom', 'results', 'consensus_results.csv')
+result_path = os.path.join(box_path, 'HierarchyWisdom', 'results', 'replicated_opf_results.csv')
 
 result_df = pd.read_csv(result_path)
 
@@ -20,15 +22,20 @@ upper_table = agg_table['mean'] + 2*agg_table['std']
 tmp_cmap = [plt.get_cmap('Set2')(i) for i in range(len(sub_nleads))]
 
 plt.figure(figsize=(15,6))
-ax = sns.scatterplot(x='N', y='n_event', hue='nlead', data=sub_df, palette=tmp_cmap)
+ax = sns.scatterplot(x='N', y='n_event', hue='nlead',
+                     data=sub_df[sub_df['nlead'].isin(sub_nleads)], palette=tmp_cmap)
+ax.set_xlim(0,1050)
+ax.set_ylim(-200, 6500)
 
 for i in range(len(sub_nleads)):
     agg_table['mean'][sub_nleads[i]].plot(ax=ax, color=tmp_cmap[i])
     ax.fill_between(agg_table.index.to_list(), lower_table[sub_nleads[i]],
                     upper_table[sub_nleads[i]], color=tmp_cmap[i], alpha=0.5)
 
+# ax.set(xlabel=None, ylabel=None)
+# plt.legend([],[], frameon=False)
 plt.title(' Time to consensus as a function of group size and number of leaders ')
-plt.savefig('results/fig1a.png')
+plt.savefig('results/fig1.png')
 
 # figure 1b
 nlead_list = list(range(51))
@@ -51,4 +58,14 @@ ax.fill_between(nlead_list, model_results['lower'], model_results['upper'], alph
 plt.ylabel('scalar stress (regression slope)')
 plt.xlabel('number of leaders')
 plt.title(' scalar stress as a function number of leader ')
-plt.savefig('results/fig1b.png')
+plt.savefig('results/catvote_scalar_stress.png')
+
+# Time to consensus while increasing number of leaders
+# ax = sns.scatterplot(x='nlead', y='n_event', data=result_df,
+#                      size=0.01, color='orange', alpha=0.3, legend=False)
+# sns.lineplot(x='nlead', y='n_event', data=result_df,
+#              ci=False, ax=ax)
+# plt.xlabel('number of leaders')
+# plt.ylabel('time to consensus')
+# plt.title('Time to consensus as a function of leader number (proportion threshold = 75%)')
+# plt.savefig('results/catvote75_inclead_time.png')

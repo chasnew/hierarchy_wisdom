@@ -4,6 +4,7 @@ import pandas as pd
 import pickle
 import yaml
 from evo_hierarchy_model import EvoOpinionModel
+import sys
 
 with open('evo_opf_config.yaml') as file:
     config_params = yaml.safe_load(file)
@@ -24,7 +25,7 @@ else:
     fixed_params['load_communities'] = None
 
 iter_num = config_params['iter_num']
-process_num = config_params['process_num']
+process_num = sys.argv[1]
 
 # initializing model
 evo_model = EvoOpinionModel(**fixed_params)
@@ -50,7 +51,7 @@ if start_gen == 1:
 
 # evolutionary iterations
 for i in range(iter_num):
-    print('step', i)
+    # print('step', i)
     evo_model.step(verbose=False, process_num=process_num)
 
     # extract alpha proportions

@@ -1,0 +1,22 @@
+result_path: 'results'
+start_gen: 1
+iter_num: 10
+fixed_params:
+  init_n: 50
+  x_threshold: 0.05
+  k: 4
+  lim_listeners: 30
+  np: 50
+  mu_rate: 0.01
+  alpha_var: 0.01
+  K: 50
+  ra: 2
+  gammar: 0.025
+  betar: 3
+  gammab: 0.005
+  betab: 10000
+  S: 0.9
+  b_mid: 500
+  Ct: 2
+  d: 1
+  m: 0.05

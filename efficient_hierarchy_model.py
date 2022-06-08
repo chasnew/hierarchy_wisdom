@@ -1,10 +1,8 @@
 # Replication of efficient hierarchy model from https://doi.org/10.1098/rspb.2020.0693
 
 import numpy as np
-from mesa import Agent, Model
-from mesa.time import RandomActivation
 
-class OpinionAgent(Agent):
+class OpinionAgent():
     """
     An agent with initial opinion and influence
 
@@ -12,8 +10,7 @@ class OpinionAgent(Agent):
     alpha: agent's influence that's translated into probability of speaking
     opinion: agent's opinion
     """
-    def __init__(self, unique_id, alpha, opinion, model, w=0):
-        super().__init__(unique_id, model)
+    def __init__(self, alpha, opinion, w=0):
         self.alpha = alpha # influence
         self.opinion = opinion
         self.w = w
@@ -21,11 +18,7 @@ class OpinionAgent(Agent):
     def __lt__(self, agent):
         return self.alpha < agent.alpha
 
-    def step(self):
-        # activate to collect data
-        pass
-
-class OpinionModel(Model):
+class OpinionModel():
     """
     A consensus building model with opinion agents that have different levels of influence
 
@@ -50,7 +43,7 @@ class OpinionModel(Model):
     def __init__(self, N, x_threshold, k, nlead, lead_alpha,
                  follw_alpha, lim_listeners, criterion='sd_threshold',
                  update_coef=None, speak_prob='non-uniform', track_agents=False):
-        self.num_agents = N
+        self.N = N
         self.x_threshold = x_threshold
         self.k = k
         self.nlead = nlead
@@ -61,43 +54,55 @@ class OpinionModel(Model):
         self.update_coef = update_coef
         self.track_agents = track_agents
         self.n_event = 0
-        self.schedule = RandomActivation(self)
         self.running = True
 
+        self.model_reporter = {'mean_opinion': lambda m: m.mean_opinion(),
+                               'sd_opinion': lambda m: m.sd_opinion(),
+                               'N': lambda m: m.N,
+                               'nlead': lambda m: m.nlead,
+                               'n_event': lambda m: m.n_event}
+
         # initialize population
-        self.construct_population(self.nlead)
+        self.population = self.create_population(self.nlead)
 
         # pre-compute speaking probabilities
         if speak_prob == 'non_uniform':
             self.speak_probs = self.calc_talk_prob()
         else:
-            self.speak_probs = np.ones(self.num_agents)/self.num_agents
+            self.speak_probs = np.ones(self.N)/self.N
 
-    def construct_population(self, nlead, random_leadx=True):
-        x_max = 1
+    def create_population(self, nlead=None, random_leadx=True):
+        population = []
 
-        # initialize leaders
-        for i in range(nlead):
-            if random_leadx:
-                # randomize leaders' opinion [0,1]
-                a = OpinionAgent(i, self.lead_alpha, np.random.rand(), self)
-                self.schedule.add(a)
-            else:
-                # evenly spaced leaders' opinion
-                tmp_opinion = (i+1)/(nlead+1)
-                a = OpinionAgent(i, self.lead_alpha, tmp_opinion, self)
-                self.schedule.add(a)
+        if nlead is not None:
+            # initialize leaders
+            for i in range(nlead):
+                if random_leadx:
+                    # randomize leaders' opinion [0,1]
+                    a = OpinionAgent(self.lead_alpha, np.random.rand())
+                    population.append(a)
+                else:
+                    # evenly spaced leaders' opinion
+                    tmp_opinion = (i + 1) / (nlead + 1)
+                    a = OpinionAgent(self.lead_alpha, tmp_opinion)
+                    population.append(a)
 
-        # initialize followers
-        for i in range(nlead, self.num_agents):
-            opinion = np.random.rand() # uniform distribution [0,1]
-            a = OpinionAgent(i, self.follw_alpha, opinion, self)
-            self.schedule.add(a)
+            # initialize followers
+            for i in range(nlead, self.N):
+                opinion = np.random.rand()  # uniform distribution [0,1]
+                a = OpinionAgent(self.follw_alpha, opinion)
+                population.append(a)
+        else:
+            for i in range(self.N):
+                population.append(OpinionAgent(alpha=np.random.rand(),
+                                               opinion=np.random.rand()))
+
+        return population
 
     def calc_talk_prob(self):
-        speak_probs = np.zeros(self.num_agents)
+        speak_probs = np.zeros(self.N)
         speak_denom = 0
-        for j, agent in enumerate(self.schedule.agents):
+        for j, agent in enumerate(self.population):
             speak_val = np.power(agent.alpha, self.k)
             speak_probs[j] = speak_val
             speak_denom += speak_val
@@ -114,44 +119,43 @@ class OpinionModel(Model):
             consensus_mask = (c_prop < 1 - self.x_threshold) | (c_prop > self.x_threshold)
             return(consensus_mask)
         elif criterion == 'faction':
-            opinion_array = np.array([agent.opinion for agent in self.schedule.agents])
+            opinion_array = np.array([agent.opinion for agent in self.population])
 
             return(True)
 
     def mean_opinion(self):
-        return np.mean([agent.opinion for agent in self.schedule.agents])
+        return np.mean([agent.opinion for agent in self.population])
 
     def sd_opinion(self):
-        return np.std([agent.opinion for agent in self.schedule.agents])
+        return np.std([agent.opinion for agent in self.population])
 
     def choice_prop(self):
-        opi_array = np.array([agent.opinion for agent in self.schedule.agents])
+        opi_array = np.array([agent.opinion for agent in self.population])
         return np.mean(opi_array < 0.5)
+
+    def report_model(self, keys):
+        datacollector = {}
+        for key in keys:
+            datacollector[key] = self.model_reporter[key](self)
+
+        return datacollector
 
     # Model time step
     def step(self):
 
-        pop_inds = np.arange(self.num_agents)
-
-        consensus = self.check_consensus(self.criterion)
-        if consensus:
-            self.running = False
+        pop_inds = np.arange(self.N)
 
         # select speaker
         speaker_ind = np.random.choice(pop_inds, p=self.speak_probs, size=1)[0]
-        speaker = self.schedule.agents[speaker_ind]
+        speaker = self.population[speaker_ind]
 
         # select listeners
         listener_inds = np.random.choice(pop_inds[pop_inds != speaker_ind],
                                          size=self.lim_listeners, replace=False)
 
-        # activate to collect agent-level data
-        if self.track_agents:
-            self.schedule.step()
-
         # update listeners' opinion
         for ind in listener_inds:
-            listener = self.schedule.agents[ind]
+            listener = self.population[ind]
 
             # calculate opinion updating coefficient
             if self.update_coef is None:
@@ -169,3 +173,7 @@ class OpinionModel(Model):
             listener.opinion = listener.opinion + (update_coef * opinion_diff)
 
         self.n_event += 1
+
+        consensus = self.check_consensus(self.criterion)
+        if consensus:
+            self.running = False

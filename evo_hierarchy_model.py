@@ -76,6 +76,7 @@ class Community():
         return population
 
     def reproduce(self):
+        np.random.seed()
 
         offsprings = []
 
@@ -135,6 +136,7 @@ class Community():
         return np.mean(np.power(alpha_devs, 3))/np.power(np.std(alpha_array), 3)
 
     def make_decision(self):
+        np.random.seed()
 
         self.speak_probs = self.calc_talk_prob()
 
@@ -283,8 +285,8 @@ class EvoOpinionModel():
         # initiate multicore-processing pool
         if process_num == -1:
             process_num = mp.cpu_count()
-            pool = mp.Pool(processes=process_num)
-        elif process_num > 1:
+
+        if process_num > 1:
             pool = mp.Pool(processes=process_num)
 
         # activate consensus building for each community
@@ -297,6 +299,9 @@ class EvoOpinionModel():
             for community in self.communities:
                 pool.apply_async(community.make_decision())
 
+            pool.close()
+            pool.join()
+
         self.step_count += 1
 
         # collecting model results
@@ -304,6 +309,9 @@ class EvoOpinionModel():
             self.datacollector[key].extend(list(map(collect_func, self.communities)))
 
         self.datacollector['step'].extend([self.step_count] * self.np)
+
+        if process_num > 1:
+            pool = mp.Pool(processes=process_num)
 
         # Reproduction step
         if process_num == 1:
@@ -313,8 +321,8 @@ class EvoOpinionModel():
             for community in self.communities:
                 pool.apply_async(community.reproduce())
 
-        if process_num > 1:
             pool.close()
+            pool.join()
 
         # for c in self.communities:
         #     print('community', c.id, ': ', c.N)

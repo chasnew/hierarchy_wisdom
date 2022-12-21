@@ -25,7 +25,7 @@ else:
     fixed_params['load_communities'] = None
 
 iter_num = config_params['iter_num']
-process_num = sys.argv[1]
+process_num = int(sys.argv[1])
 
 # initializing model
 evo_model = EvoOpinionModel(**fixed_params)
@@ -51,7 +51,7 @@ if start_gen == 1:
 
 # evolutionary iterations
 for i in range(iter_num):
-    # print('step', i)
+    print('step', i)
     evo_model.step(verbose=False, process_num=process_num)
 
     # extract alpha proportions
@@ -90,3 +90,5 @@ community_data.to_csv(result_file, index=False)
 
 # save communities
 evo_model.save_communities(filepath=pkl_path)
+
+print('simulation is complete.')

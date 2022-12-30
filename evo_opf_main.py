@@ -11,6 +11,7 @@ with open('evo_opf_config.yaml') as file:
 
 result_path = config_params['result_path']
 start_gen = config_params['start_gen']
+sim_num = config_params['sim_num']
 fixed_params = config_params['fixed_params']
 
 # load stored communities in case of on-going simulation
@@ -69,13 +70,22 @@ for i in range(iter_num):
     alpha_hist = alpha_hist / np.sum(alpha_hist)
     alpha_pool_hists.append(alpha_hist)
 
-filename = 'replicated_sep_alpha{}.npy'.format(start_gen)
-with open(os.path.join(result_path, filename), 'wb') as file:
-    np.save(file, np.array(alpha_sep_hists))
+if start_gen == 0:
+    filename = 'replicated_sep_alpha_sim{}.npy'.format(sim_num)
+    with open(os.path.join(result_path, filename), 'wb') as file:
+        np.save(file, np.array(alpha_sep_hists))
 
-filename = 'replicated_pool_alpha{}.npy'.format(start_gen)
-with open(os.path.join(result_path, filename), 'wb') as file:
-    np.save(file, np.array(alpha_pool_hists))
+    filename = 'replicated_pool_alpha_sim{}.npy'.format(sim_num)
+    with open(os.path.join(result_path, filename), 'wb') as file:
+        np.save(file, np.array(alpha_pool_hists))
+else:
+    filename = 'replicated_sep_alpha{}_sim{}.npy'.format(start_gen, sim_num)
+    with open(os.path.join(result_path, filename), 'wb') as file:
+        np.save(file, np.array(alpha_sep_hists))
+
+    filename = 'replicated_pool_alpha{}_sim{}.npy'.format(start_gen, sim_num)
+    with open(os.path.join(result_path, filename), 'wb') as file:
+        np.save(file, np.array(alpha_pool_hists))
 
 # retrieve model-level results
 community_data = pd.DataFrame(evo_model.datacollector)
@@ -84,7 +94,11 @@ community_data['step'] = community_data['step'] + (start_gen-1)
 # print(community_data.iloc[:5, :])
 
 # save data
-filename = 'replicated_evo_results{}.csv'.format(start_gen)
+if start_gen == 0:
+    filename = 'replicated_evo_results_sim{}.csv'.format(sim_num)
+else:
+    filename = 'replicated_evo_results{}_sim{}.csv'.format(start_gen, sim_num)
+
 result_file = os.path.join(result_path, filename)
 community_data.to_csv(result_file, index=False)
 

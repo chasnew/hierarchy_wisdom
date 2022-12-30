@@ -1,6 +1,7 @@
-result_path: 'results'
+result_path: '/Users/chanuwasaswamenakul/Library/CloudStorage/Box-Box/HierarchyWisdom/results'
 start_gen: 1
 iter_num: 10
+sim_num: 1
 fixed_params:
   init_n: 50
   x_threshold: 0.05

@@ -7,8 +7,8 @@ import seaborn as sns
 plt.style.use('seaborn')
 
 box_path = '/Users/chanuwasaswamenakul/Library/CloudStorage/Box-Box'
-result_path = os.path.join(box_path, 'HierarchyWisdom', 'results', 'replicated_evo_results.csv')
-alpha_path = os.path.join(box_path, 'HierarchyWisdom', 'results', 'replicated_pool_alpha.npy')
+result_path = os.path.join(box_path, 'HierarchyWisdom', 'results', 'replicated_evo_results_sim1.csv')
+alpha_path = os.path.join(box_path, 'HierarchyWisdom', 'results', 'replicated_pool_alpha_sim1.npy')
 
 result_df = pd.read_csv(result_path)
 result_df['group_id'] = result_df['group_id'].astype(str)
@@ -50,35 +50,52 @@ sns.set(rc={'figure.figsize': (15, 6)})
 new_yticks = list(range(0,251,25))
 ytick_labels = np.round(np.linspace(0,1,num=len(new_yticks)), 2)
 
-new_xticks = list(range(0,7501, 1500))
-# xtick_labels = np.linspace(0, 7500, num=len(new_xticks))
+new_xticks = list(range(0,10001, 1500))
 
-ax = sns.heatmap(heatmap_array.T, cmap='coolwarm', cbar_kws={'shrink': 0.5,
-                                                             'label': 'influence'})
+ax = sns.heatmap(heatmap_array.T, cmap='coolwarm',
+                 vmin=0, vmax=1,
+                 cbar_kws={'shrink': 0.5, 'label': 'influence'})
+ax.set_xlabel('generation', fontsize=18)
+ax.set_ylabel('proportion of individuals', fontsize=18)
 ax.set_yticks(new_yticks)
 ax.set_yticklabels(ytick_labels)
 ax.set_xticks(new_xticks)
 ax.set_xticklabels(new_xticks, rotation=0)
 # plt.title('pooled alpha distribution of 50 patches over time')
-plt.show()
+plt.savefig('results/fig2.png')
+plt.close()
 
-sample_groups = np.random.choice(np.arange(50), size=5, replace=True).astype(str)
-sample_results = result_df[result_df['group_id'].isin(sample_groups)]
+# zoomed-in heatmap
+new_yticks = list(range(0,101,25))
+ytick_labels = np.round(np.linspace(0.6,1,num=len(new_yticks)), 2)
 
-ax = sns.lineplot(x='step', y='group_size', hue='group_id',
-                  estimator=None, lw=1, data=sample_results)
-ax.get_legend().remove()
-plt.title('population size over time of different patches')
-plt.show()
+new_xticks = list(range(0,101,25))
+xtick_labels = list(range(9900,10001, 25))
 
-sns.lineplot(x='step', y='group_size', data=result_df)
-plt.title('population size over time of different patches')
-plt.show()
+ax = sns.heatmap(heatmap_array[9900:,150:].T, cmap='coolwarm',
+                 vmin=0, vmax=1,
+                 cbar_kws={'shrink': 0.5, 'label': 'influence'})
 
-sns.lineplot(x='step', y='alpha_skewness', data=result_df)
-plt.show()
+ax.set_xlabel('generation', fontsize=18)
+ax.set_ylabel('proportion of individuals', fontsize=18)
+ax.set_yticks(new_yticks)
+ax.set_yticklabels(ytick_labels)
+ax.set_xticks(new_xticks)
+ax.set_xticklabels(xtick_labels, rotation=0)
+plt.savefig('results/fig2_zoomed.png')
+plt.close()
 
-ax = sns.lineplot(x='step', y='n_event', hue='group_id',
-                  estimator=None, lw=1, data=result_df)
-ax.get_legend().remove()
-plt.show()
+# skewness plot
+ax = sns.lineplot(x='step', y='alpha_skewness', data=result_df)
+ax.set_xlabel('generation', fontsize=18)
+ax.set_ylabel('skewness of influence', fontsize=18)
+plt.savefig('results/evo_alpha_skewness.png')
+plt.close()
+
+# sample_groups = np.random.choice(np.arange(50), size=5, replace=True).astype(str)
+# sample_results = result_df[result_df['group_id'].isin(sample_groups)]
+#
+# ax = sns.lineplot(x='step', y='n_event', hue='group_id',
+#                   estimator=None, lw=1, data=result_df)
+# ax.get_legend().remove()
+# plt.show()

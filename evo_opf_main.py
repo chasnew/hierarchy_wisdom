@@ -37,7 +37,7 @@ alpha_pool = []
 alpha_sep_hists = []
 alpha_pool_hists = []
 
-if start_gen == 1:
+if start_gen <= 1:
     # extract init alpha proportions
     for c in evo_model.communities:
         alpha_list = [agent.alpha for agent in c.population]
@@ -90,6 +90,8 @@ else:
 # retrieve model-level results
 community_data = pd.DataFrame(evo_model.datacollector)
 community_data['step'] = community_data['step'] + (start_gen-1)
+if start_gen > 0:
+    community_data['step'] = community_data['step'] - 1
 # print(community_data.info())
 # print(community_data.iloc[:5, :])
 

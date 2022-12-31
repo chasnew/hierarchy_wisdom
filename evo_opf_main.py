@@ -89,9 +89,8 @@ else:
 
 # retrieve model-level results
 community_data = pd.DataFrame(evo_model.datacollector)
-community_data['step'] = community_data['step'] + (start_gen-1)
 if start_gen > 0:
-    community_data['step'] = community_data['step'] - 1
+    community_data['step'] = community_data['step'] + (start_gen-1)
 # print(community_data.info())
 # print(community_data.iloc[:5, :])
 

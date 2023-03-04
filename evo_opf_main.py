@@ -13,6 +13,7 @@ result_path = config_params['result_path']
 start_gen = config_params['start_gen']
 sim_num = config_params['sim_num']
 fixed_params = config_params['fixed_params']
+sephist_step = config_params['sephist_step']
 
 # load stored communities in case of on-going simulation
 pkl_path = os.path.join(result_path, 'replicated_communities.pkl')
@@ -58,13 +59,14 @@ for i in range(iter_num):
     # extract alpha proportions
     alpha_pool = []
 
-    for c in evo_model.communities:
-        alpha_list = [agent.alpha for agent in c.population]
-        alpha_pool.extend(alpha_list)
+    if i % sephist_step:
+        for c in evo_model.communities:
+            alpha_list = [agent.alpha for agent in c.population]
+            alpha_pool.extend(alpha_list)
 
-        alpha_hist = np.histogram(np.array(alpha_list), bins=50, range=(0, 1))[0]
-        alpha_hist = alpha_hist / np.sum(alpha_hist)
-        alpha_sep_hists.append(alpha_hist)
+            alpha_hist = np.histogram(np.array(alpha_list), bins=50, range=(0, 1))[0]
+            alpha_hist = alpha_hist / np.sum(alpha_hist)
+            alpha_sep_hists.append(alpha_hist)
 
     alpha_hist = np.histogram(np.array(alpha_pool), bins=50, range=(0, 1))[0]
     alpha_hist = alpha_hist / np.sum(alpha_hist)
@@ -96,9 +98,9 @@ if start_gen > 0:
 
 # save data
 if start_gen == 0:
-    filename = 'replicated_evo_results_sim{}.csv'.format(sim_num)
+    filename = 'mod_evo_results_sim{}.csv'.format(sim_num)
 else:
-    filename = 'replicated_evo_results{}_sim{}.csv'.format(start_gen, sim_num)
+    filename = 'mod_evo_results{}_sim{}.csv'.format(start_gen, sim_num)
 
 result_file = os.path.join(result_path, filename)
 community_data.to_csv(result_file, index=False)

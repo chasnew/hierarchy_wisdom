@@ -16,7 +16,7 @@ fixed_params = config_params['fixed_params']
 sephist_step = config_params['sephist_step']
 
 # load stored communities in case of on-going simulation
-pkl_path = os.path.join(result_path, 'replicated_communities.pkl')
+pkl_path = os.path.join(result_path, 'modevo_communities.pkl')
 
 if start_gen > 1:
     with open(pkl_path, 'rb') as file:
@@ -73,19 +73,19 @@ for i in range(iter_num):
     alpha_pool_hists.append(alpha_hist)
 
 if start_gen == 0:
-    filename = 'replicated_sep_alpha_sim{}.npy'.format(sim_num)
+    filename = 'modsep_sa{}_alpha_sim{}.npy'.format(fixed_params['SAt'], sim_num)
     with open(os.path.join(result_path, filename), 'wb') as file:
         np.save(file, np.array(alpha_sep_hists))
 
-    filename = 'replicated_pool_alpha_sim{}.npy'.format(sim_num)
+    filename = 'modpool_sa{}_alpha_sim{}.npy'.format(fixed_params['SAt'], sim_num)
     with open(os.path.join(result_path, filename), 'wb') as file:
         np.save(file, np.array(alpha_pool_hists))
 else:
-    filename = 'replicated_sep_alpha{}_sim{}.npy'.format(start_gen, sim_num)
+    filename = 'modsep_sa{}_alpha{}_sim{}.npy'.format(fixed_params['SAt'], start_gen, sim_num)
     with open(os.path.join(result_path, filename), 'wb') as file:
         np.save(file, np.array(alpha_sep_hists))
 
-    filename = 'replicated_pool_alpha{}_sim{}.npy'.format(start_gen, sim_num)
+    filename = 'modpool_sa{}_alpha{}_sim{}.npy'.format(fixed_params['SAt'], start_gen, sim_num)
     with open(os.path.join(result_path, filename), 'wb') as file:
         np.save(file, np.array(alpha_pool_hists))
 
@@ -98,9 +98,9 @@ if start_gen > 0:
 
 # save data
 if start_gen == 0:
-    filename = 'mod_evo_results_sim{}.csv'.format(sim_num)
+    filename = 'modevo_sa{}_results_sim{}.csv'.format(fixed_params['SAt'], sim_num)
 else:
-    filename = 'mod_evo_results{}_sim{}.csv'.format(start_gen, sim_num)
+    filename = 'modevo_sa{}_results{}_sim{}.csv'.format(fixed_params['SAt'], start_gen, sim_num)
 
 result_file = os.path.join(result_path, filename)
 community_data.to_csv(result_file, index=False)

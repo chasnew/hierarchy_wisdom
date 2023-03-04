@@ -40,10 +40,13 @@ class Community():
     S: the benefit that will inherit to the next generation
     b_mid: group size at the sigmoid's midpoint (sigmoid parameter)
     Ct: time constraints on group consensus building
+    SAt: speed-accuracy tradeoff parameter
+        where 1 will favor fast consensus and -1 will favor slow consensus
     d: ecological inequality
     """
     def __init__(self, unique_id, model, N, x_threshold, k, lim_listeners,
-                 mu_rate, alpha_var, K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, d):
+                 mu_rate, alpha_var, K, ra, gammar, betar, gammab, betab, S,
+                 b_mid, Ct, SAt, d):
         self.id = unique_id
         self.N = N
         self.x_threshold = x_threshold
@@ -60,6 +63,7 @@ class Community():
         self.S = S
         self.b_mid = b_mid
         self.Ct = Ct
+        self.SAt = SAt
         self.d = d
         self.n_event = 0
         self.Bt = 0 # additional resource produced by group
@@ -177,7 +181,7 @@ class Community():
         # Calculate additional resource produced by the group (group-level payoff)
         prev_Bt = self.Bt
         self.Bt = (self.betab/(1 + np.exp(-self.gammab*(self.N - self.b_mid)))) -\
-                  (self.Ct * self.n_event)
+                  (self.Ct * self.n_event) ** self.SAt
         self.Bt = max(0, self.Bt)
 
         # Calculate the share of resources each individual receives
@@ -217,13 +221,15 @@ class EvoOpinionModel():
     S: the benefit that will inherit to the next generation
     b_mid: group size at the sigmoid's midpoint (sigmoid parameter)
     Ct: time constraints on group consensus building
+    SAt: speed-accuracy tradeoff parameter
+        where 1 will favor fast consensus and -1 will favor slow consensus
     d: ecological inequality
     m: migration rate
     load_communities: a set of communities provided to the model in a scenario
         where user wants to resume the simulation
     """
     def __init__(self, init_n, x_threshold, k, lim_listeners, np, mu_rate, alpha_var,
-                 K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, d, m,
+                 K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, SAt, d, m,
                  load_communities=None):
         self.init_n = init_n
         self.x_threshold = x_threshold
@@ -241,6 +247,7 @@ class EvoOpinionModel():
         self.S = S
         self.b_mid = b_mid
         self.Ct = Ct
+        self.SAt = SAt
         self.d = d
         self.m = m
         self.step_count = 0
@@ -277,6 +284,7 @@ class EvoOpinionModel():
                                                S=self.S,
                                                b_mid=self.b_mid,
                                                Ct=self.Ct,
+                                               SAt=self.SAt,
                                                d=self.d))
 
     # Model time step

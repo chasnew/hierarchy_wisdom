@@ -181,7 +181,7 @@ class Community():
         # Calculate additional resource produced by the group (group-level payoff)
         prev_Bt = self.Bt
         self.Bt = (self.betab/(1 + np.exp(-self.gammab*(self.N - self.b_mid)))) -\
-                  (self.Ct * self.n_event) ** self.SAt
+                  self.Ct * (self.n_event ** self.SAt)
         self.Bt = max(0, self.Bt)
 
         # Calculate the share of resources each individual receives

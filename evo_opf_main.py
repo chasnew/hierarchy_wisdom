@@ -45,6 +45,7 @@ if start_gen <= 1:
         alpha_pool.extend(alpha_list)
 
         alpha_hist = np.histogram(np.array(alpha_list), bins=50, range=(0, 1))[0]
+        alpha_hist = alpha_hist / np.sum(alpha_hist)
         alpha_sep_hists.append(alpha_hist)
 
     alpha_hist = np.histogram(np.array(alpha_pool), bins=50, range=(0, 1))[0]
@@ -59,11 +60,11 @@ for i in range(iter_num):
     # extract alpha proportions
     alpha_pool = []
 
-    if i % sephist_step:
-        for c in evo_model.communities:
-            alpha_list = [agent.alpha for agent in c.population]
-            alpha_pool.extend(alpha_list)
+    for c in evo_model.communities:
+        alpha_list = [agent.alpha for agent in c.population]
+        alpha_pool.extend(alpha_list)
 
+        if (i % sephist_step) == 0:
             alpha_hist = np.histogram(np.array(alpha_list), bins=50, range=(0, 1))[0]
             alpha_hist = alpha_hist / np.sum(alpha_hist)
             alpha_sep_hists.append(alpha_hist)

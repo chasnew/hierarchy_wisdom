@@ -133,6 +133,7 @@ class Community():
         return np.mean([agent.alpha for agent in self.population])
 
     # Pearson’s moment coefficient of skewness
+    # Function in original Java code: skewness = [n / (n -1) (n - 2)] sum[(x_i - mean)^3] / std^3
     def influence_skewness(self):
         alpha_array = np.array([agent.alpha for agent in self.population])
         alpha_devs = alpha_array - np.mean(alpha_array)

@@ -74,19 +74,19 @@ for i in range(iter_num):
     alpha_pool_hists.append(alpha_hist)
 
 if start_gen == 0:
-    filename = 'modsep_sa{}_alpha_sim{}.npy'.format(fixed_params['SAt'], sim_num)
+    filename = 'modsep_ct{}_alpha_sim{}.npy'.format(fixed_params['Ct'], sim_num)
     with open(os.path.join(result_path, filename), 'wb') as file:
         np.save(file, np.array(alpha_sep_hists))
 
-    filename = 'modpool_sa{}_alpha_sim{}.npy'.format(fixed_params['SAt'], sim_num)
+    filename = 'modpool_ct{}_alpha_sim{}.npy'.format(fixed_params['Ct'], sim_num)
     with open(os.path.join(result_path, filename), 'wb') as file:
         np.save(file, np.array(alpha_pool_hists))
 else:
-    filename = 'modsep_sa{}_alpha{}_sim{}.npy'.format(fixed_params['SAt'], start_gen, sim_num)
+    filename = 'modsep_ct{}_alpha{}_sim{}.npy'.format(fixed_params['Ct'], start_gen, sim_num)
     with open(os.path.join(result_path, filename), 'wb') as file:
         np.save(file, np.array(alpha_sep_hists))
 
-    filename = 'modpool_sa{}_alpha{}_sim{}.npy'.format(fixed_params['SAt'], start_gen, sim_num)
+    filename = 'modpool_ct{}_alpha{}_sim{}.npy'.format(fixed_params['Ct'], start_gen, sim_num)
     with open(os.path.join(result_path, filename), 'wb') as file:
         np.save(file, np.array(alpha_pool_hists))
 
@@ -99,9 +99,9 @@ if start_gen > 0:
 
 # save data
 if start_gen == 0:
-    filename = 'modevo_sa{}_results_sim{}.csv'.format(fixed_params['SAt'], sim_num)
+    filename = 'modevo_ct{}_results_sim{}.csv'.format(fixed_params['Ct'], sim_num)
 else:
-    filename = 'modevo_sa{}_results{}_sim{}.csv'.format(fixed_params['SAt'], start_gen, sim_num)
+    filename = 'modevo_ct{}_results{}_sim{}.csv'.format(fixed_params['Ct'], start_gen, sim_num)
 
 result_file = os.path.join(result_path, filename)
 community_data.to_csv(result_file, index=False)

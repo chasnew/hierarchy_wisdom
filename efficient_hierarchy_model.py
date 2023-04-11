@@ -129,6 +129,12 @@ class OpinionModel():
     def sd_opinion(self):
         return np.std([agent.opinion for agent in self.population])
 
+    def left_sd_opinion(self):
+        return np.std([agent.opinion for agent in self.population if agent.opinion <= 0.5])
+
+    def right_sd_opinion(self):
+        return np.std([agent.opinion for agent in self.population if agent.opinion > 0.5])
+
     def choice_prop(self):
         opi_array = np.array([agent.opinion for agent in self.population])
         return np.mean(opi_array < 0.5)

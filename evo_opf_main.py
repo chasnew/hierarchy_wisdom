@@ -15,8 +15,11 @@ sim_num = config_params['sim_num']
 fixed_params = config_params['fixed_params']
 sephist_step = config_params['sephist_step']
 
+crit_abbv = fixed_params['criterion'].split('_')[0]
+
 # load stored communities in case of on-going simulation
-pkl_path = os.path.join(result_path, 'modevo_communities.pkl')
+pkl_path = os.path.join(result_path, 'modevo_ct{}_{}_communities{}.pkl'.format(fixed_params['Ct'],
+                                                                               crit_abbv, sim_num))
 
 if start_gen > 1:
     with open(pkl_path, 'rb') as file:
@@ -27,7 +30,7 @@ else:
     fixed_params['load_communities'] = None
 
 iter_num = config_params['iter_num']
-process_num = int(sys.argv[1])
+process_num = 1 #int(sys.argv[1])
 
 # initializing model
 evo_model = EvoOpinionModel(**fixed_params)
@@ -74,19 +77,23 @@ for i in range(iter_num):
     alpha_pool_hists.append(alpha_hist)
 
 if start_gen == 0:
-    filename = 'modsep_ct{}_alpha_sim{}.npy'.format(fixed_params['Ct'], sim_num)
+    filename = 'modsep_ct{}_{}_alpha_sim{}.npy'.format(fixed_params['Ct'],
+                                                       crit_abbv, sim_num)
     with open(os.path.join(result_path, filename), 'wb') as file:
         np.save(file, np.array(alpha_sep_hists))
 
-    filename = 'modpool_ct{}_alpha_sim{}.npy'.format(fixed_params['Ct'], sim_num)
+    filename = 'modpool_ct{}_{}_alpha_sim{}.npy'.format(fixed_params['Ct'],
+                                                        crit_abbv, sim_num)
     with open(os.path.join(result_path, filename), 'wb') as file:
         np.save(file, np.array(alpha_pool_hists))
 else:
-    filename = 'modsep_ct{}_alpha{}_sim{}.npy'.format(fixed_params['Ct'], start_gen, sim_num)
+    filename = 'modsep_ct{}_{}_alpha{}_sim{}.npy'.format(fixed_params['Ct'],
+                                                         crit_abbv, start_gen, sim_num)
     with open(os.path.join(result_path, filename), 'wb') as file:
         np.save(file, np.array(alpha_sep_hists))
 
-    filename = 'modpool_ct{}_alpha{}_sim{}.npy'.format(fixed_params['Ct'], start_gen, sim_num)
+    filename = 'modpool_ct{}_{}_alpha{}_sim{}.npy'.format(fixed_params['Ct'],
+                                                          crit_abbv, start_gen, sim_num)
     with open(os.path.join(result_path, filename), 'wb') as file:
         np.save(file, np.array(alpha_pool_hists))
 
@@ -99,9 +106,11 @@ if start_gen > 0:
 
 # save data
 if start_gen == 0:
-    filename = 'modevo_ct{}_results_sim{}.csv'.format(fixed_params['Ct'], sim_num)
+    filename = 'modevo_ct{}_{}_results_sim{}.csv'.format(fixed_params['Ct'],
+                                                         crit_abbv, sim_num)
 else:
-    filename = 'modevo_ct{}_results{}_sim{}.csv'.format(fixed_params['Ct'], start_gen, sim_num)
+    filename = 'modevo_ct{}_{}_results{}_sim{}.csv'.format(fixed_params['Ct'],
+                                                           crit_abbv, start_gen, sim_num)
 
 result_file = os.path.join(result_path, filename)
 community_data.to_csv(result_file, index=False)

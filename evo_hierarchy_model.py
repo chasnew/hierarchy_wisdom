@@ -25,46 +25,14 @@ class Community():
     """
     A community of opinion agents that try to reach a consensus to produce payoffs
 
+    unique_id: ID of the community
+    model: evolutionary model super class that stores all parameters
     N: the number of agents in the community
-    x_threshold: consensus threshold
-    k: exponent determining the mapping between influence and speaking probability
-    lim_listeners: number of listeners per speaking event
-    mu_rate: mutation rate of influence value
-    alpha_var: variance of influence when mutation occurs
-    K: carrying capacity for population growth equation
-    ra: intrinsic growth rate
-    gammar: steepness of growth rate induced by extra resources
-    betar: max increase in growth rate induced by extra resources
-    gammab: steepness of increase in benefit induced by participants
-    betab: max increase in benefit induced by number of participants
-    S: the benefit that will inherit to the next generation
-    b_mid: group size at the sigmoid's midpoint (sigmoid parameter)
-    Ct: time constraints on group consensus building
-    SAt: speed-accuracy tradeoff parameter
-        where 1 will favor fast consensus and -1 will favor slow consensus
-    d: ecological inequality
     """
     def __init__(self, unique_id, model, N):
         self.id = unique_id
         self.model = model
         self.N = N
-        # self.x_threshold = x_threshold
-        # self.k = k
-        # self.lim_listeners = lim_listeners
-        # self.mu_rate = mu_rate
-        # self.alpha_var = alpha_var
-        # self.K = K
-        # self.ra = ra
-        # self.gammar = gammar
-        # self.betar = betar
-        # self.gammab = gammab
-        # self.betab = betab
-        # self.S = S
-        # self.b_mid = b_mid
-        # self.Ct = Ct
-        # self.SAt = SAt
-        # self.d = d
-        # self.criterion = criterion
         self.n_event = 0
         self.Bt = 0 # additional resource produced by group
 

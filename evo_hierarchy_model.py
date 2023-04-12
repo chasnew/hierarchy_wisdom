@@ -133,17 +133,17 @@ class Community():
         return np.std([agent.opinion for agent in self.population if agent.opinion > 0.5])
 
     def left_dissent(self):
-        return np.abs([0.5 - agent.opinion for agent in self.population if agent.opinion <= 0.5])
+        return np.mean(np.abs([0.5 - agent.opinion for agent in self.population if agent.opinion <= 0.5]))
 
     def right_dissent(self):
-        return np.abs([0.5 - agent.opinion for agent in self.population if agent.opinion > 0.5])
+        return np.mean(np.abs([0.5 - agent.opinion for agent in self.population if agent.opinion > 0.5]))
 
     def choice_prop(self):
         opi_array = np.array([agent.opinion for agent in self.population])
         return np.mean(opi_array < 0.5)
 
     def majority_side(self):
-        if self.choice_prop() > self.model.criterion:
+        if self.choice_prop() > self.model.x_threshold:
             return 'left'
         else:
             return 'right'

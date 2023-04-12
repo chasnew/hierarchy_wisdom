@@ -44,27 +44,27 @@ class Community():
         where 1 will favor fast consensus and -1 will favor slow consensus
     d: ecological inequality
     """
-    def __init__(self, unique_id, model, N, x_threshold, k, lim_listeners,
-                 mu_rate, alpha_var, K, ra, gammar, betar, gammab, betab, S,
-                 b_mid, Ct, SAt, d):
+    def __init__(self, unique_id, model, N):
         self.id = unique_id
+        self.model = model
         self.N = N
-        self.x_threshold = x_threshold
-        self.k = k
-        self.lim_listeners = lim_listeners
-        self.mu_rate = mu_rate
-        self.alpha_var = alpha_var
-        self.K = K
-        self.ra = ra
-        self.gammar = gammar
-        self.betar = betar
-        self.gammab = gammab
-        self.betab = betab
-        self.S = S
-        self.b_mid = b_mid
-        self.Ct = Ct
-        self.SAt = SAt
-        self.d = d
+        # self.x_threshold = x_threshold
+        # self.k = k
+        # self.lim_listeners = lim_listeners
+        # self.mu_rate = mu_rate
+        # self.alpha_var = alpha_var
+        # self.K = K
+        # self.ra = ra
+        # self.gammar = gammar
+        # self.betar = betar
+        # self.gammab = gammab
+        # self.betab = betab
+        # self.S = S
+        # self.b_mid = b_mid
+        # self.Ct = Ct
+        # self.SAt = SAt
+        # self.d = d
+        # self.criterion = criterion
         self.n_event = 0
         self.Bt = 0 # additional resource produced by group
 
@@ -89,13 +89,13 @@ class Community():
             o_n = np.random.poisson(agent.w)
 
             # randomize mutation
-            mutation_masks = np.random.choice([0,1], p=[1-self.mu_rate, self.mu_rate], size=o_n)
+            mutation_masks = np.random.choice([0,1], p=[1-self.model.mu_rate, self.model.mu_rate], size=o_n)
 
             # adjusted truncated thresholds
-            a, b = (0 - agent.opinion) / self.alpha_var, (1 - agent.opinion) / self.alpha_var
+            a, b = (0 - agent.opinion) / self.model.alpha_var, (1 - agent.opinion) / self.model.alpha_var
 
             # mutated alpha values
-            o_alphas = truncnorm.rvs(a , b, loc=agent.alpha, scale=self.alpha_var, size=o_n)
+            o_alphas = truncnorm.rvs(a , b, loc=agent.alpha, scale=self.model.alpha_var, size=o_n)
             o_alphas = [agent.alpha if mutation_masks[i] == 0 else o_alphas[i] for i in range(o_n)]
 
             offspring_tmp = [OpinionAgent(alpha=o_alphas[i],
@@ -113,7 +113,7 @@ class Community():
         speak_probs = np.zeros(self.N)
         speak_denom = 0
         for j, agent in enumerate(self.population):
-            speak_val = np.power(agent.alpha, self.k)
+            speak_val = np.power(agent.alpha, self.model.k)
             speak_probs[j] = speak_val
             speak_denom += speak_val
         speak_probs = speak_probs / speak_denom
@@ -126,11 +126,36 @@ class Community():
     def sd_opinion(self):
         return np.std([agent.opinion for agent in self.population])
 
+    def left_sd_opinion(self):
+        return np.std([agent.opinion for agent in self.population if agent.opinion <= 0.5])
+
+    def right_sd_opinion(self):
+        return np.std([agent.opinion for agent in self.population if agent.opinion > 0.5])
+
+    def left_dissent(self):
+        return np.abs([0.5 - agent.opinion for agent in self.population if agent.opinion <= 0.5])
+
+    def right_dissent(self):
+        return np.abs([0.5 - agent.opinion for agent in self.population if agent.opinion > 0.5])
+
+    def choice_prop(self):
+        opi_array = np.array([agent.opinion for agent in self.population])
+        return np.mean(opi_array < 0.5)
+
+    def majority_side(self):
+        if self.choice_prop() > self.model.criterion:
+            return 'left'
+        else:
+            return 'right'
+
     def mean_fitness(self):
         return np.mean([agent.w for agent in self.population])
 
     def mean_influence(self):
         return np.mean([agent.alpha for agent in self.population])
+
+    def sd_influence(self):
+        return np.std([agent.alpha for agent in self.population])
 
     # Pearson’s moment coefficient of skewness
     # Function in original Java code: skewness = [n / (n -1) (n - 2)] sum[(x_i - mean)^3] / std^3
@@ -140,18 +165,28 @@ class Community():
 
         return np.mean(np.power(alpha_devs, 3))/np.power(np.std(alpha_array), 3)
 
+    def check_consensus(self, criterion='sd_threshold'):
+        if criterion == 'sd_threshold':
+            opi_sd = self.sd_opinion()
+            return (opi_sd < self.model.x_threshold)
+        elif criterion == 'prop_threshold':
+            c_prop = self.choice_prop()
+            consensus_mask = (c_prop < 1 - self.model.x_threshold) | (c_prop > self.model.x_threshold)
+            return (consensus_mask)
+        else:
+            return (True)
+
     def make_decision(self):
         np.random.seed()
 
         self.speak_probs = self.calc_talk_prob()
 
         pop_inds = np.arange(len(self.population))
-        opi_sd = self.sd_opinion()
         init_opinions = np.array([agent.opinion for agent in self.population])
 
         self.n_event = 0
 
-        while(opi_sd > self.x_threshold):
+        while(not self.check_consensus(criterion=self.model.criterion)):
 
             # select speaker
             speaker_ind = np.random.choice(pop_inds, p=self.speak_probs, size=1)[0]
@@ -159,7 +194,7 @@ class Community():
 
             # select listeners
             listener_inds = np.random.choice(pop_inds[pop_inds != speaker_ind],
-                                             size=self.lim_listeners, replace=False)
+                                             size=self.model.lim_listeners, replace=False)
 
             # update listeners' opinion
             for ind in listener_inds:
@@ -181,21 +216,21 @@ class Community():
 
         # Calculate additional resource produced by the group (group-level payoff)
         prev_Bt = self.Bt
-        self.Bt = (self.betab/(1 + np.exp(-self.gammab*(self.N - self.b_mid)))) -\
-                  self.Ct * (self.n_event ** self.SAt)
+        self.Bt = (self.model.betab/(1 + np.exp(-self.model.gammab*(self.N - self.model.b_mid)))) -\
+                  self.model.Ct * (self.n_event ** self.model.SAt)
         self.Bt = max(0, self.Bt)
 
         # Calculate the share of resources each individual receives
         alphar = 1 - np.abs(init_opinions - self.mean_opinion())
 
-        pt = (1 + (self.d * alphar))
+        pt = (1 + (self.model.d * alphar))
         pt = pt/np.sum(pt)
 
         # Calculate additional growth rate for each individual
-        rb = self.betar * (1 - np.exp(-self.gammar * ((self.Bt + (self.S * prev_Bt)) * pt)))
+        rb = self.model.betar * (1 - np.exp(-self.model.gammar * ((self.Bt + (self.model.S * prev_Bt)) * pt)))
 
         # Calculate fitness for each individual
-        w = (self.ra / (1 + (self.N/self.K))) + rb
+        w = (self.model.ra / (1 + (self.N/self.model.K))) + rb
         w[ w < 0 ] = 0
 
         for i, agent in enumerate(self.population):
@@ -231,7 +266,7 @@ class EvoOpinionModel():
     """
     def __init__(self, init_n, x_threshold, k, lim_listeners, np, mu_rate, alpha_var,
                  K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, SAt, d, m,
-                 load_communities=None):
+                 criterion='sd_threshold', load_communities=None):
         self.init_n = init_n
         self.x_threshold = x_threshold
         self.k = k
@@ -251,6 +286,7 @@ class EvoOpinionModel():
         self.SAt = SAt
         self.d = d
         self.m = m
+        self.criterion = criterion
         self.step_count = 0
         self.communities = set() # or list()
         self.agent_reporter = {'group_id': lambda c: c.id,
@@ -260,6 +296,13 @@ class EvoOpinionModel():
                                # 'avg_fitness': lambda c: c.mean_fitness(),
                                'avg_alpha': lambda c: c.mean_influence(),
                                'alpha_skewness': lambda c: c.influence_skewness()}
+        if criterion == 'prop_threshold':
+            self.agent_reporter.update({'sd_opinion': lambda c: c.sd_opinion(),
+                                        'left_sd_opinion': lambda c: c.left_sd_opinion(),
+                                        'right_sd_opinion': lambda c: c.right_sd_opinion(),
+                                        'left_dissent': lambda c: c.left_dissent(),
+                                        'right_dissent': lambda c: c.right_dissent(),
+                                        'majority_side': lambda c: c.majority_side()})
         self.datacollector = {key: [] for key in self.agent_reporter.keys()}
         self.datacollector['step'] = []
 
@@ -270,23 +313,7 @@ class EvoOpinionModel():
             for i in range(self.np):
                 self.communities.add(Community(unique_id=i,
                                                model=self,
-                                               N=self.init_n,
-                                               x_threshold=self.x_threshold,
-                                               k=self.k,
-                                               lim_listeners=self.lim_listeners,
-                                               mu_rate=self.mu_rate,
-                                               alpha_var=self.alpha_var,
-                                               K=self.K,
-                                               ra=self.ra,
-                                               gammar=self.gammar,
-                                               betar=self.betar,
-                                               gammab=self.gammab,
-                                               betab=self.betab,
-                                               S=self.S,
-                                               b_mid=self.b_mid,
-                                               Ct=self.Ct,
-                                               SAt=self.SAt,
-                                               d=self.d))
+                                               N=self.init_n))
 
     # Model time step
     def step(self, verbose=False, process_num=1):

@@ -157,11 +157,32 @@ class Community():
         while(not self.check_consensus(criterion=self.model.criterion)):
 
             # select speaker
-            speaker_ind = np.random.choice(pop_inds, p=self.speak_probs, size=1)[0]
-            speaker = self.population[speaker_ind]
+            speaker_inds = np.random.choice(pop_inds, p=self.speak_probs,
+                                            size=self.model.lim_speakers, replace=False)
+            if self.model.lim_speakers > 1:
+                speakers = [self.population[i] for i in speaker_inds]
+
+                speaker_alphas = []
+                speaker_opinions = []
+                for i in range(len(speakers)):
+                     speaker_alphas.append(speakers[i].alpha)
+                     speaker_opinions.append(speakers[i].opinion)
+
+                speaker_alphas = np.array(speaker_alphas)
+                speaker_opinions = np.array(speaker_opinions)
+
+                speaker_influence = np.mean(speaker_alphas)
+                speaker_position = np.sum((speaker_alphas / np.sum(speaker_alphas)) * speaker_opinions)
+            else:
+                speaker_ind = speaker_inds[0]
+                speaker_influence = self.population[speaker_ind].alpha
+                speaker_position = self.population[speaker_ind].opinion
+
+            non_speaker_masks = np.ones(len(self.population), np.bool)
+            non_speaker_masks[speaker_inds] = 0
 
             # select listeners
-            listener_inds = np.random.choice(pop_inds[pop_inds != speaker_ind],
+            listener_inds = np.random.choice(pop_inds[non_speaker_masks],
                                              size=self.model.lim_listeners, replace=False)
 
             # update listeners' opinion
@@ -169,12 +190,12 @@ class Community():
                 listener = self.population[ind]
 
                 # calculate difference in influence
-                alpha_diff = speaker.alpha - listener.alpha
+                alpha_diff = speaker_influence - listener.alpha
                 if alpha_diff <= 0:
                     alpha_diff = 0.01
 
                 # calculate difference in opinion
-                opinion_diff = speaker.opinion - listener.opinion
+                opinion_diff = speaker_position - listener.opinion
 
                 # update opinion
                 listener.opinion = listener.opinion + (alpha_diff * opinion_diff)
@@ -232,12 +253,13 @@ class EvoOpinionModel():
     load_communities: a set of communities provided to the model in a scenario
         where user wants to resume the simulation
     """
-    def __init__(self, init_n, x_threshold, k, lim_listeners, np, mu_rate, alpha_var,
+    def __init__(self, init_n, x_threshold, k, lim_speakers, lim_listeners, np, mu_rate, alpha_var,
                  K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, SAt, d, m,
                  criterion='sd_threshold', load_communities=None):
         self.init_n = init_n
         self.x_threshold = x_threshold
         self.k = k
+        self.lim_speakers = lim_speakers
         self.lim_listeners = lim_listeners
         self.np = np
         self.mu_rate = mu_rate

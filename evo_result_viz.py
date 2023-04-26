@@ -6,14 +6,22 @@ import seaborn as sns
 
 plt.style.use('seaborn')
 
+ct = 0
+criterion = 'prop'
+
 box_path = '/Users/chanuwasaswamenakul/Library/CloudStorage/Box-Box'
-result_path = os.path.join(box_path, 'HierarchyWisdom', 'results', 'replicated_evo_results_sim1.csv')
-alpha_path = os.path.join(box_path, 'HierarchyWisdom', 'results', 'replicated_pool_alpha_sim1.npy')
+result_path = os.path.join(box_path, 'HierarchyWisdom', 'results',
+                           'modevo_ct{}_{}_results_sim1.csv'.format(ct, criterion))
+alpha_path = os.path.join(box_path, 'HierarchyWisdom', 'results',
+                          'modpool_ct{}_{}_alpha_sim1.npy'.format(ct, criterion))
 
 result_df = pd.read_csv(result_path)
 result_df['group_id'] = result_df['group_id'].astype(str)
 
 alpha_array = np.load(alpha_path)
+
+alpha_array = alpha_array[~np.isnan(alpha_array).any(axis=1),:]
+
 cum_alpha = alpha_array.cumsum(axis=1)
 
 # create a heatmap to replicate figure 2
@@ -61,8 +69,8 @@ ax.set_yticks(new_yticks)
 ax.set_yticklabels(ytick_labels)
 ax.set_xticks(new_xticks)
 ax.set_xticklabels(new_xticks, rotation=0)
-# plt.title('pooled alpha distribution of 50 patches over time')
-plt.savefig('results/fig2.png')
+plt.title('pooled alpha distribution of 50 patches over time when C = {}'.format(ct))
+plt.savefig('results/evoalpha_ct{}_{}_distribution1.png'.format(ct, criterion))
 plt.close()
 
 # zoomed-in heatmap
@@ -82,20 +90,12 @@ ax.set_yticks(new_yticks)
 ax.set_yticklabels(ytick_labels)
 ax.set_xticks(new_xticks)
 ax.set_xticklabels(xtick_labels, rotation=0)
-plt.savefig('results/fig2_zoomed.png')
+plt.savefig('results/fig2_3_zoomed.png')
 plt.close()
 
 # skewness plot
-ax = sns.lineplot(x='step', y='alpha_skewness', data=result_df)
+ax = sns.lineplot(x='step', y='alpha_skewness', data=result_df, ci='sd')
 ax.set_xlabel('generation', fontsize=18)
 ax.set_ylabel('skewness of influence', fontsize=18)
-plt.savefig('results/evo_alpha_skewness.png')
+plt.savefig('results/evo_ct{}_{}_alpha_skewness1.png'.format(ct, criterion))
 plt.close()
-
-# sample_groups = np.random.choice(np.arange(50), size=5, replace=True).astype(str)
-# sample_results = result_df[result_df['group_id'].isin(sample_groups)]
-#
-# ax = sns.lineplot(x='step', y='n_event', hue='group_id',
-#                   estimator=None, lw=1, data=result_df)
-# ax.get_legend().remove()
-# plt.show()

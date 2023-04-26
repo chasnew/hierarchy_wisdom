@@ -4,13 +4,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-plt.style.use('seaborn')
+# plt.style.use('seaborn')
 
 ct = 2
+criterion = 'sd'
 
 box_path = '/Users/chanuwasaswamenakul/Library/CloudStorage/Box-Box'
 result_path = os.path.join(box_path, 'HierarchyWisdom', 'results',
-                           'modevo_ct{}_results_sim1.csv'.format(ct))
+                           'modevo_ct{}_{}_results_sim1.csv'.format(ct, criterion))
 
 result_df = pd.read_csv(result_path)
 result_df['group_id'] = result_df['group_id'].astype(str)
@@ -39,11 +40,13 @@ plt.show()
 
 # iterate over different values of C parameter (time cost)
 cbPalette = ['#999999', '#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7']
-ct_list = [0, 1, 2]
+ct_list = [-1, 0, 1, 2]
 
-for i in range(3):
+plt.figure(figsize=(15,6))
+
+for i in range(4):
     result_path = os.path.join(box_path, 'HierarchyWisdom', 'results',
-                               'modevo_ct{}_results_sim1.csv'.format(ct_list[i]))
+                               'modevo_ct{}_{}_results_sim1.csv'.format(ct_list[i], criterion))
     result_df = pd.read_csv(result_path)
     result_df['group_id'] = result_df['group_id'].astype(str)
 

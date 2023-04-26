@@ -2,7 +2,7 @@
 
 import numpy as np
 from scipy.stats import truncnorm
-import pickle
+import joblib
 import multiprocessing as mp
 
 class OpinionAgent():
@@ -29,10 +29,30 @@ class Community():
     model: evolutionary model super class that stores all parameters
     N: the number of agents in the community
     """
-    def __init__(self, unique_id, model, N):
+    def __init__(self, unique_id, N, x_threshold, k, lim_speakers, lim_listeners,
+                 mu_rate, alpha_var, K, ra, gammar, betar, gammab, betab, S,
+                 b_mid, Ct, SAt, d, criterion):
         self.id = unique_id
-        self.model = model
         self.N = N
+        self.x_threshold = x_threshold
+        self.k = k
+        self.lim_speakers = lim_speakers
+        self.lim_listeners = lim_listeners
+        self.mu_rate = mu_rate
+        self.alpha_var = alpha_var
+        self.K = K
+        self.ra = ra
+        self.gammar = gammar
+        self.betar = betar
+        self.gammab = gammab
+        self.betab = betab
+        self.S = S
+        self.b_mid = b_mid
+        self.Ct = Ct
+        self.SAt = SAt
+        self.d = d
+        self.criterion = criterion
+
         self.n_event = 0
         self.Bt = 0 # additional resource produced by group
 
@@ -57,13 +77,13 @@ class Community():
             o_n = np.random.poisson(agent.w)
 
             # randomize mutation
-            mutation_masks = np.random.choice([0,1], p=[1-self.model.mu_rate, self.model.mu_rate], size=o_n)
+            mutation_masks = np.random.choice([0,1], p=[1-self.mu_rate, self.mu_rate], size=o_n)
 
             # adjusted truncated thresholds
-            a, b = (0 - agent.opinion) / self.model.alpha_var, (1 - agent.opinion) / self.model.alpha_var
+            a, b = (0 - agent.opinion) / self.alpha_var, (1 - agent.opinion) / self.alpha_var
 
             # mutated alpha values
-            o_alphas = truncnorm.rvs(a , b, loc=agent.alpha, scale=self.model.alpha_var, size=o_n)
+            o_alphas = truncnorm.rvs(a , b, loc=agent.alpha, scale=self.alpha_var, size=o_n)
             o_alphas = [agent.alpha if mutation_masks[i] == 0 else o_alphas[i] for i in range(o_n)]
 
             offspring_tmp = [OpinionAgent(alpha=o_alphas[i],
@@ -81,7 +101,7 @@ class Community():
         speak_probs = np.zeros(self.N)
         speak_denom = 0
         for j, agent in enumerate(self.population):
-            speak_val = np.power(agent.alpha, self.model.k)
+            speak_val = np.power(agent.alpha, self.k)
             speak_probs[j] = speak_val
             speak_denom += speak_val
         speak_probs = speak_probs / speak_denom
@@ -111,7 +131,7 @@ class Community():
         return np.mean(opi_array < 0.5)
 
     def majority_side(self):
-        if self.choice_prop() > self.model.x_threshold:
+        if self.choice_prop() > self.x_threshold:
             return 'left'
         else:
             return 'right'
@@ -136,10 +156,11 @@ class Community():
     def check_consensus(self, criterion='sd_threshold'):
         if criterion == 'sd_threshold':
             opi_sd = self.sd_opinion()
-            return (opi_sd < self.model.x_threshold)
+            return (opi_sd < self.x_threshold)
         elif criterion == 'prop_threshold':
             c_prop = self.choice_prop()
-            consensus_mask = (c_prop < 1 - self.model.x_threshold) | (c_prop > self.model.x_threshold)
+            threshold = 0.5 + np.exp(-self.x_threshold*self.n_event)/2
+            consensus_mask = (c_prop < 1 - threshold) | (c_prop > threshold)
             return (consensus_mask)
         else:
             return (True)
@@ -154,12 +175,12 @@ class Community():
 
         self.n_event = 0
 
-        while(not self.check_consensus(criterion=self.model.criterion)):
+        while(not self.check_consensus(criterion=self.criterion)):
 
             # select speaker
             speaker_inds = np.random.choice(pop_inds, p=self.speak_probs,
-                                            size=self.model.lim_speakers, replace=False)
-            if self.model.lim_speakers > 1:
+                                            size=self.lim_speakers, replace=False)
+            if self.lim_speakers > 1:
                 speakers = [self.population[i] for i in speaker_inds]
 
                 speaker_alphas = []
@@ -183,7 +204,7 @@ class Community():
 
             # select listeners
             listener_inds = np.random.choice(pop_inds[non_speaker_masks],
-                                             size=self.model.lim_listeners, replace=False)
+                                             size=self.lim_listeners, replace=False)
 
             # update listeners' opinion
             for ind in listener_inds:
@@ -200,26 +221,25 @@ class Community():
                 # update opinion
                 listener.opinion = listener.opinion + (alpha_diff * opinion_diff)
 
-            opi_sd = self.sd_opinion()
             self.n_event += 1
 
         # Calculate additional resource produced by the group (group-level payoff)
         prev_Bt = self.Bt
-        self.Bt = (self.model.betab/(1 + np.exp(-self.model.gammab*(self.N - self.model.b_mid)))) -\
-                  self.model.Ct * (self.n_event ** self.model.SAt)
+        self.Bt = (self.betab/(1 + np.exp(-self.gammab*(self.N - self.b_mid)))) -\
+                  self.Ct * (self.n_event ** self.SAt)
         self.Bt = max(0, self.Bt)
 
         # Calculate the share of resources each individual receives
         alphar = 1 - np.abs(init_opinions - self.mean_opinion())
 
-        pt = (1 + (self.model.d * alphar))
+        pt = (1 + (self.d * alphar))
         pt = pt/np.sum(pt)
 
         # Calculate additional growth rate for each individual
-        rb = self.model.betar * (1 - np.exp(-self.model.gammar * ((self.Bt + (self.model.S * prev_Bt)) * pt)))
+        rb = self.betar * (1 - np.exp(-self.gammar * ((self.Bt + (self.S * prev_Bt)) * pt)))
 
         # Calculate fitness for each individual
-        w = (self.model.ra / (1 + (self.N/self.model.K))) + rb
+        w = (self.ra / (1 + (self.N/self.K))) + rb
         w[ w < 0 ] = 0
 
         for i, agent in enumerate(self.population):
@@ -231,8 +251,10 @@ class EvoOpinionModel():
     A consensus building model with opinion agents that have different levels of influence
 
     init_n: initial number of agents in each community
-    x_threshold: consensus threshold
+    x_threshold: consensus threshold for sd-criterion,
+        but stands in for exponential decay parameter for proportional criterion
     k: exponent determining the mapping between influence and speaking probability
+    lim_speakers: number of speakers per speaking event
     lim_listeners: number of listeners per speaking event
     np: number of community patches
     mu_rate: mutation rate of influence value
@@ -302,8 +324,25 @@ class EvoOpinionModel():
         else:
             for i in range(self.np):
                 self.communities.add(Community(unique_id=i,
-                                               model=self,
-                                               N=self.init_n))
+                                               N=self.init_n,
+                                               x_threshold=self.x_threshold,
+                                               k=self.k,
+                                               lim_speakers=self.lim_speakers,
+                                               lim_listeners=self.lim_listeners,
+                                               mu_rate=self.mu_rate,
+                                               alpha_var=self.alpha_var,
+                                               K=self.K,
+                                               ra=self.ra,
+                                               gammar=self.gammar,
+                                               betar=self.betar,
+                                               gammab=self.gammab,
+                                               betab=self.betab,
+                                               S=self.S,
+                                               b_mid=self.b_mid,
+                                               Ct=self.Ct,
+                                               SAt=self.SAt,
+                                               d=self.d,
+                                               criterion=self.criterion))
 
     # Model time step
     def step(self, verbose=False, process_num=1):
@@ -382,5 +421,5 @@ class EvoOpinionModel():
         #     print('community', c.id, ': ', c.N)
 
     def save_communities(self, filepath):
-        with open(filepath, 'wb') as file:
-            pickle.dump(self.communities, file)
+        # with open(filepath, 'wb') as file:
+        joblib.dump(self.communities, filepath)

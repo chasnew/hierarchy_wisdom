@@ -39,7 +39,7 @@ class Community():
         self.lim_speakers = lim_speakers
         self.lim_listeners = lim_listeners
         self.mu_rate = mu_rate
-        self.alpha_var = alpha_var
+        self.alpha_std = np.sqrt(alpha_var)
         self.K = K
         self.ra = ra
         self.gammar = gammar
@@ -80,10 +80,10 @@ class Community():
             mutation_masks = np.random.choice([0,1], p=[1-self.mu_rate, self.mu_rate], size=o_n)
 
             # adjusted truncated thresholds
-            a, b = (0 - agent.opinion) / self.alpha_var, (1 - agent.opinion) / self.alpha_var
+            a, b = (0 - agent.alpha) / self.alpha_std, (1 - agent.alpha) / self.alpha_std
 
             # mutated alpha values
-            o_alphas = truncnorm.rvs(a , b, loc=agent.alpha, scale=self.alpha_var, size=o_n)
+            o_alphas = truncnorm.rvs(a , b, loc=agent.alpha, scale=self.alpha_std, size=o_n)
             o_alphas = [agent.alpha if mutation_masks[i] == 0 else o_alphas[i] for i in range(o_n)]
 
             offspring_tmp = [OpinionAgent(alpha=o_alphas[i],
@@ -177,10 +177,18 @@ class Community():
 
         while(not self.check_consensus(criterion=self.criterion)):
 
+            speaker_num = self.lim_speakers
+
+            # if number of speakers and listeners combined is bigger than the population
+            if (self.lim_speakers + self.lim_listeners) > len(self.population):
+                speaker_num = len(self.population) - self.lim_listeners
+
             # select speaker
             speaker_inds = np.random.choice(pop_inds, p=self.speak_probs,
-                                            size=self.lim_speakers, replace=False)
-            if self.lim_speakers > 1:
+                                            size=speaker_num, replace=False)
+
+            # average speaker opinions and influence of multiple speakers
+            if speaker_num > 1:
                 speakers = [self.population[i] for i in speaker_inds]
 
                 speaker_alphas = []
@@ -193,6 +201,8 @@ class Community():
                 speaker_opinions = np.array(speaker_opinions)
 
                 speaker_influence = np.mean(speaker_alphas)
+
+                # influence-weighted opinion
                 speaker_position = np.sum((speaker_alphas / np.sum(speaker_alphas)) * speaker_opinions)
             else:
                 speaker_ind = speaker_inds[0]
@@ -222,6 +232,9 @@ class Community():
                 listener.opinion = listener.opinion + (alpha_diff * opinion_diff)
 
             self.n_event += 1
+            # print(self.sd_opinion())
+
+        # print(speaker_inds.shape[0])
 
         # Calculate additional resource produced by the group (group-level payoff)
         prev_Bt = self.Bt

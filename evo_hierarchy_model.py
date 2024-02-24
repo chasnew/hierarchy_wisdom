@@ -2,6 +2,7 @@
 
 import numpy as np
 from scipy.stats import truncnorm
+from collections import Counter
 import joblib
 import multiprocessing as mp
 
@@ -13,10 +14,11 @@ class OpinionAgent():
     alpha: agent's influence that's translated into probability of speaking
     opinion: agent's opinion
     """
-    def __init__(self, alpha, opinion, w=0):
+    def __init__(self, alpha, opinion, w=0, cd=0):
         self.alpha = alpha # influence
         self.opinion = opinion
         self.w = w
+        self.con_dist = cd
 
     def __lt__(self, agent):
         return self.alpha < agent.alpha
@@ -31,7 +33,7 @@ class Community():
     """
     def __init__(self, unique_id, N, x_threshold, k, lim_speakers, lim_listeners,
                  mu_rate, alpha_var, K, ra, gammar, betar, gammab, betab, S,
-                 b_mid, Ct, SAt, d, criterion):
+                 b_mid, Ct, d, criterion, init_cond):
         self.id = unique_id
         self.N = N
         self.x_threshold = x_threshold
@@ -49,7 +51,6 @@ class Community():
         self.S = S
         self.b_mid = b_mid
         self.Ct = Ct
-        self.SAt = SAt
         self.d = d
         self.criterion = criterion
 
@@ -57,45 +58,33 @@ class Community():
         self.Bt = 0 # additional resource produced by group
 
         # create a population of agents
-        self.population = self.create_population()
+        self.population = self.create_population(init_cond)
 
-    def create_population(self):
+    def create_population(self, init_cond='uniform'):
         population = []
-        for i in range(self.N):
-            population.append(OpinionAgent(alpha=np.random.rand(),
-                                           opinion=np.random.rand()))
+
+        if init_cond == 'uniform':
+            for i in range(self.N):
+                population.append(OpinionAgent(alpha=np.random.rand(),
+                                               opinion=np.random.rand()))
+        elif init_cond == 'all_leaders':
+            for i in range(self.N):
+                population.append(OpinionAgent(alpha=1,
+                                               opinion=np.random.rand()))
+        elif init_cond == 'all_followers':
+            for i in range(self.N):
+                population.append(OpinionAgent(alpha=0,
+                                               opinion=np.random.rand()))
+        elif init_cond == 'left_skew':
+            for i in range(self.N):
+                population.append(OpinionAgent(alpha=np.random.beta(a=2,b=1,size=1)[0],
+                                               opinion=np.random.rand()))
+        elif init_cond == 'right_skew':
+            for i in range(self.N):
+                population.append(OpinionAgent(alpha=np.random.beta(a=1,b=2,size=1)[0],
+                                               opinion=np.random.rand()))
 
         return population
-
-    def reproduce(self):
-        np.random.seed()
-
-        offsprings = []
-
-        for agent in self.population:
-            # might need to adjust opinion to inheritance mode
-            o_n = np.random.poisson(agent.w)
-
-            # randomize mutation
-            mutation_masks = np.random.choice([0,1], p=[1-self.mu_rate, self.mu_rate], size=o_n)
-
-            # adjusted truncated thresholds
-            a, b = (0 - agent.alpha) / self.alpha_std, (1 - agent.alpha) / self.alpha_std
-
-            # mutated alpha values
-            o_alphas = truncnorm.rvs(a , b, loc=agent.alpha, scale=self.alpha_std, size=o_n)
-            o_alphas = [agent.alpha if mutation_masks[i] == 0 else o_alphas[i] for i in range(o_n)]
-
-            offspring_tmp = [OpinionAgent(alpha=o_alphas[i],
-                                          opinion=np.random.rand())
-                             for i in range(o_n)]
-            offsprings.extend(offspring_tmp)
-
-        # reproduction step
-        self.population = offsprings
-
-        # update population parameter
-        self.N = len(self.population)
 
     def calc_talk_prob(self):
         speak_probs = np.zeros(self.N)
@@ -183,7 +172,7 @@ class Community():
             if (self.lim_speakers + self.lim_listeners) > len(self.population):
                 speaker_num = len(self.population) - self.lim_listeners
 
-            # select speaker
+            # select speaker(s)
             speaker_inds = np.random.choice(pop_inds, p=self.speak_probs,
                                             size=speaker_num, replace=False)
 
@@ -234,22 +223,22 @@ class Community():
             self.n_event += 1
             # print(self.sd_opinion())
 
-        # print(speaker_inds.shape[0])
-
         # Calculate additional resource produced by the group (group-level payoff)
         prev_Bt = self.Bt
         self.Bt = (self.betab/(1 + np.exp(-self.gammab*(self.N - self.b_mid)))) -\
-                  self.Ct * (self.n_event ** self.SAt)
+                  self.Ct * self.n_event
         self.Bt = max(0, self.Bt)
 
         # Calculate the share of resources each individual receives
-        alphar = 1 - np.abs(init_opinions - self.mean_opinion())
+        con_diff = np.abs(init_opinions - self.mean_opinion())
+        alphar = 1 - con_diff
 
-        pt = (1 + (self.d * alphar))
+        pt = (0.001 + (self.d * alphar))
         pt = pt/np.sum(pt)
 
         # Calculate additional growth rate for each individual
         rb = self.betar * (1 - np.exp(-self.gammar * ((self.Bt + (self.S * prev_Bt)) * pt)))
+        # rb[ rb < 0 ] = 0
 
         # Calculate fitness for each individual
         w = (self.ra / (1 + (self.N/self.K))) + rb
@@ -257,6 +246,57 @@ class Community():
 
         for i, agent in enumerate(self.population):
             agent.w = w[i]
+            agent.con_dist = con_diff[i]
+
+
+    def reproduce(self):
+        np.random.seed()
+
+        offsprings = []
+
+        for agent in self.population:
+            # might need to adjust opinion to inheritance mode
+            o_n = np.random.poisson(agent.w)
+
+            # randomize mutation
+            mutation_masks = np.random.choice([0,1], p=[1-self.mu_rate, self.mu_rate], size=o_n)
+
+            # adjusted truncated thresholds
+            a, b = (0 - agent.alpha) / self.alpha_std, (1 - agent.alpha) / self.alpha_std
+
+            # mutated alpha values
+            o_alphas = truncnorm.rvs(a , b, loc=agent.alpha, scale=self.alpha_std, size=o_n)
+            o_alphas = [agent.alpha if mutation_masks[i] == 0 else o_alphas[i] for i in range(o_n)]
+
+            offspring_tmp = [OpinionAgent(alpha=o_alphas[i],
+                                          opinion=np.random.rand(),
+                                          cd=agent.con_dist,
+                                          w=agent.w)
+                             for i in range(o_n)]
+            offsprings.extend(offspring_tmp)
+
+        # reproduction step
+        self.population = offsprings
+
+        # update population parameter
+        self.N = len(self.population)
+
+
+    def die(self, survive_prob=1):
+
+        cur_n = self.N
+        new_n = int(np.round(cur_n * survive_prob))
+        removed_n = cur_n - new_n
+
+        for _ in range(removed_n):
+            self.population.pop(np.random.randint(len(self.population)))
+
+        self.N = len(self.population)
+
+
+    def reset_opinion(self):
+        for agent in self.population:
+            agent.opinion = np.random.rand()
 
 
 class EvoOpinionModel():
@@ -281,16 +321,16 @@ class EvoOpinionModel():
     S: the benefit that will inherit to the next generation
     b_mid: group size at the sigmoid's midpoint (sigmoid parameter)
     Ct: time constraints on group consensus building
-    SAt: speed-accuracy tradeoff parameter
-        where 1 will favor fast consensus and -1 will favor slow consensus
     d: ecological inequality
     m: migration rate
+    criterion: decision rule for the groups (either based on sd threshold or proportional threshold)
+    init_cond: initial conditions for distribution of influence among agents
     load_communities: a set of communities provided to the model in a scenario
         where user wants to resume the simulation
     """
     def __init__(self, init_n, x_threshold, k, lim_speakers, lim_listeners, np, mu_rate, alpha_var,
-                 K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, SAt, d, m,
-                 criterion='sd_threshold', load_communities=None):
+                 K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, d, m,
+                 criterion='sd_threshold', init_cond='uniform', load_communities=None):
         self.init_n = init_n
         self.x_threshold = x_threshold
         self.k = k
@@ -308,10 +348,10 @@ class EvoOpinionModel():
         self.S = S
         self.b_mid = b_mid
         self.Ct = Ct
-        self.SAt = SAt
         self.d = d
         self.m = m
         self.criterion = criterion
+        self.init_cond = init_cond
         self.step_count = 0
         self.communities = set() # or list()
         self.agent_reporter = {'group_id': lambda c: c.id,
@@ -319,6 +359,7 @@ class EvoOpinionModel():
                                'group_size': lambda c: c.N,
                                # 'extra_resource': lambda c: c.Bt,
                                # 'avg_fitness': lambda c: c.mean_fitness(),
+                               'mean_opinion': lambda c: c.mean_opinion(),
                                'avg_alpha': lambda c: c.mean_influence(),
                                'alpha_skewness': lambda c: c.influence_skewness()}
         if criterion == 'prop_threshold':
@@ -353,12 +394,29 @@ class EvoOpinionModel():
                                                S=self.S,
                                                b_mid=self.b_mid,
                                                Ct=self.Ct,
-                                               SAt=self.SAt,
                                                d=self.d,
-                                               criterion=self.criterion))
+                                               criterion=self.criterion,
+                                               init_cond=self.init_cond))
 
     # Model time step
-    def step(self, verbose=False, process_num=1):
+    def step(self, capped_pop=False, verbose=False, process_num=1):
+
+        self.form_decision(verbose=verbose, process_num=process_num)
+        self.step_count += 1
+
+        # collecting model results
+        for key, collect_func in self.agent_reporter.items():
+            self.datacollector[key].extend(list(map(collect_func, self.communities)))
+
+        self.datacollector['step'].extend([self.step_count] * self.np)
+
+        self.reproduce(process_num=process_num)
+        self.migrate()
+
+        if capped_pop:
+            self.rescale_pop()
+
+    def form_decision(self, verbose=False, process_num=1):
 
         # initiate multicore-processing pool
         if process_num == -1:
@@ -380,14 +438,9 @@ class EvoOpinionModel():
             pool.close()
             pool.join()
 
-        self.step_count += 1
+    def reproduce(self, process_num=1):
 
-        # collecting model results
-        for key, collect_func in self.agent_reporter.items():
-            self.datacollector[key].extend(list(map(collect_func, self.communities)))
-
-        self.datacollector['step'].extend([self.step_count] * self.np)
-
+        # initiate multicore-processing pool
         if process_num > 1:
             pool = mp.Pool(processes=process_num)
 
@@ -402,36 +455,91 @@ class EvoOpinionModel():
             pool.close()
             pool.join()
 
-        # for c in self.communities:
-        #     print('community', c.id, ': ', c.N)
+    def reset_opinion(self):
+        for community in self.communities:
+            community.reset_opinion()
+
+    def migrate(self):
 
         # Migration step
         if self.np > 1 and self.m is not None:
             list_com = list(self.communities)
             c_migrants = []
+            # prem_pop_dict = {}
+            # groupm_dict = {}
 
-            ## sample migrants
+            ## sample migrants from all communities
             for i in range(self.np):
                 community = list_com[i]
                 pop_ids = np.arange(len(community.population))
+                # prem_pop_dict[i] = len(community.population) # group size for each community
                 m_masks = np.random.binomial(size=pop_ids.shape[0], n=1, p=self.m)
                 m_ids = pop_ids[m_masks == 1]
-                c_migrants.append([community.population.pop(m_id) for m_id in reversed(m_ids)])
 
-            ## assign patches
+                # list of each group's migrants (list within list)
+                c_migrants.append([community.population.pop(m_id) for m_id in reversed(m_ids)])
+                # groupm_dict[i] = len(c_migrants[i])
+
+            ## assign patches to all migrants
             c_ids = np.arange(self.np)
+            # mto_list = []
             for i in range(self.np):
                 new_c_ids = np.random.choice(c_ids[c_ids != i], size=len(c_migrants[i]), replace=True)
+                # mto_list.extend(new_c_ids)
 
                 for c_id in new_c_ids:
                     list_com[c_id].population.append(c_migrants[i].pop(0))
 
-            ## update group size
-            for c in self.communities:
-                c.N = len(c.population)
+            # mto_dict = dict(sorted(Counter(mto_list).items()))
 
-        # for c in self.communities:
-        #     print('community', c.id, ': ', c.N)
+            ## update group size
+            # postm_pop_dict = {}
+            for i, c in enumerate(self.communities):
+                c.N = len(c.population)
+                # postm_pop_dict[i] = c.N
+
+            # print('Pre-migration size = ', prem_pop_dict)
+            # print('Migrants from each group = ', groupm_dict)
+            # print('Migrants to each group = ', mto_dict)
+            # print('Post-migration size = ', postm_pop_dict)
+
+    # rescaling total population to a fixed size
+    def rescale_pop(self, process_num=1):
+
+        fixed_n = self.init_n * self.np
+        total_n = 0
+
+        for community in self.communities:
+            total_n += community.N
+
+        print('Pre-rescaling population size = ', total_n)
+
+        if fixed_n < total_n:
+
+            rescaled_coef = fixed_n / total_n
+            print(rescaled_coef)
+
+            # initiate multicore-processing pool
+            if process_num > 1:
+                pool = mp.Pool(processes=process_num)
+
+            # Reproduction step
+            if process_num == 1:
+                for community in self.communities:
+                    community.die(survive_prob=rescaled_coef)
+            else:
+                for community in self.communities:
+                    pool.apply_async(community.die(rescaled_coef))
+
+                pool.close()
+                pool.join()
+
+            tmp_n = 0
+            for community in self.communities:
+                tmp_n += community.N
+
+            print('Post-rescaling pop = ', tmp_n)
+
 
     def save_communities(self, filepath):
         # with open(filepath, 'wb') as file:

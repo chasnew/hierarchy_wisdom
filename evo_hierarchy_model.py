@@ -14,11 +14,13 @@ class OpinionAgent():
     alpha: agent's influence that's translated into probability of speaking
     opinion: agent's opinion
     """
-    def __init__(self, alpha, opinion, w=0, cd=0):
+    def __init__(self, alpha, opinion, cid, w=0, cd=0, mv=0):
         self.alpha = alpha # influence
         self.opinion = opinion
+        self.cid = cid
         self.w = w
         self.con_dist = cd
+        self.mv_dist = mv
 
     def __lt__(self, agent):
         return self.alpha < agent.alpha
@@ -53,12 +55,13 @@ class Community():
         self.Ct = Ct
         self.d = d
         self.criterion = criterion
+        self.init_cond = init_cond
 
         self.n_event = 0
         self.Bt = 0 # additional resource produced by group
 
         # create a population of agents
-        self.population = self.create_population(init_cond)
+        self.population = self.create_population(self.init_cond)
 
     def create_population(self, init_cond='uniform'):
         population = []
@@ -66,23 +69,28 @@ class Community():
         if init_cond == 'uniform':
             for i in range(self.N):
                 population.append(OpinionAgent(alpha=np.random.rand(),
-                                               opinion=np.random.rand()))
-        elif init_cond == 'all_leaders':
+                                               opinion=np.random.rand(),
+                                               cid=self.id))
+        elif init_cond == 'most_leaders':
             for i in range(self.N):
-                population.append(OpinionAgent(alpha=1,
-                                               opinion=np.random.rand()))
-        elif init_cond == 'all_followers':
+                population.append(OpinionAgent(alpha=np.random.beta(a=1.9,b=0.1,size=1)[0],
+                                               opinion=np.random.rand(),
+                                               cid=self.id))
+        elif init_cond == 'most_followers':
             for i in range(self.N):
-                population.append(OpinionAgent(alpha=0,
-                                               opinion=np.random.rand()))
+                population.append(OpinionAgent(alpha=np.random.beta(a=0.1,b=1.9,size=1)[0],
+                                               opinion=np.random.rand(),
+                                               cid=self.id))
         elif init_cond == 'left_skew':
             for i in range(self.N):
-                population.append(OpinionAgent(alpha=np.random.beta(a=2,b=1,size=1)[0],
-                                               opinion=np.random.rand()))
+                population.append(OpinionAgent(alpha=np.random.beta(a=1.5,b=0.5,size=1)[0],
+                                               opinion=np.random.rand(),
+                                               cid=self.id))
         elif init_cond == 'right_skew':
             for i in range(self.N):
-                population.append(OpinionAgent(alpha=np.random.beta(a=1,b=2,size=1)[0],
-                                               opinion=np.random.rand()))
+                population.append(OpinionAgent(alpha=np.random.beta(a=0.5,b=1.5,size=1)[0],
+                                               opinion=np.random.rand(),
+                                               cid=self.id))
 
         return population
 
@@ -225,28 +233,30 @@ class Community():
 
         # Calculate additional resource produced by the group (group-level payoff)
         prev_Bt = self.Bt
-        self.Bt = (self.betab/(1 + np.exp(-self.gammab*(self.N - self.b_mid)))) -\
-                  self.Ct * self.n_event
+        # self.Bt = (self.betab/(1 + np.exp(-self.gammab*(self.N - self.b_mid)))) -\
+        #           self.Ct * self.n_event
+        self.Bt = self.betab - self.Ct * self.n_event # no group size effect
         self.Bt = max(0, self.Bt)
 
         # Calculate the share of resources each individual receives
         con_diff = np.abs(init_opinions - self.mean_opinion())
         alphar = 1 - con_diff
 
-        pt = (0.001 + (self.d * alphar))
+        pt = (1 + (self.d * alphar))
         pt = pt/np.sum(pt)
 
         # Calculate additional growth rate for each individual
         rb = self.betar * (1 - np.exp(-self.gammar * ((self.Bt + (self.S * prev_Bt)) * pt)))
-        # rb[ rb < 0 ] = 0
+        rb[ rb < 0 ] = 0
 
         # Calculate fitness for each individual
-        w = (self.ra / (1 + (self.N/self.K))) + rb
-        w[ w < 0 ] = 0
+        # w = (self.ra / (1 + (self.N/self.K))) + rb
+        w = self.ra + rb
 
         for i, agent in enumerate(self.population):
             agent.w = w[i]
             agent.con_dist = con_diff[i]
+            agent.mv_dist = np.abs(agent.opinion - init_opinions[i])
 
 
     def reproduce(self):
@@ -270,6 +280,7 @@ class Community():
 
             offspring_tmp = [OpinionAgent(alpha=o_alphas[i],
                                           opinion=np.random.rand(),
+                                          cid=self.id,
                                           cd=agent.con_dist,
                                           w=agent.w)
                              for i in range(o_n)]
@@ -282,11 +293,10 @@ class Community():
         self.N = len(self.population)
 
 
-    def die(self, survive_prob=1):
+    def die(self, death_rate=0):
 
         cur_n = self.N
-        new_n = int(np.round(cur_n * survive_prob))
-        removed_n = cur_n - new_n
+        removed_n = int(np.round(cur_n * death_rate))
 
         for _ in range(removed_n):
             self.population.pop(np.random.randint(len(self.population)))
@@ -309,7 +319,7 @@ class EvoOpinionModel():
     k: exponent determining the mapping between influence and speaking probability
     lim_speakers: number of speakers per speaking event
     lim_listeners: number of listeners per speaking event
-    np: number of community patches
+    ng: number of groups
     mu_rate: mutation rate of influence value
     alpha_var: variance of influence when mutation occurs
     K: carrying capacity for population growth equation
@@ -323,20 +333,26 @@ class EvoOpinionModel():
     Ct: time constraints on group consensus building
     d: ecological inequality
     m: migration rate
+    dr: death rate
     criterion: decision rule for the groups (either based on sd threshold or proportional threshold)
     init_cond: initial conditions for distribution of influence among agents
     load_communities: a set of communities provided to the model in a scenario
         where user wants to resume the simulation
     """
-    def __init__(self, init_n, x_threshold, k, lim_speakers, lim_listeners, np, mu_rate, alpha_var,
-                 K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, d, m,
+    def __init__(self, init_n, x_threshold, k, lim_speakers, lim_listeners, ng, mu_rate, alpha_var,
+                 K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, d, m, dr=0,
                  criterion='sd_threshold', init_cond='uniform', load_communities=None):
+
+        # rescale base payoff for cases when slow decision is favored
+        if Ct < 0:
+            betab = 0
+
         self.init_n = init_n
         self.x_threshold = x_threshold
         self.k = k
         self.lim_speakers = lim_speakers
         self.lim_listeners = lim_listeners
-        self.np = np
+        self.ng = ng
         self.mu_rate = mu_rate
         self.alpha_var = alpha_var
         self.K = K
@@ -350,10 +366,11 @@ class EvoOpinionModel():
         self.Ct = Ct
         self.d = d
         self.m = m
+        self.dr = dr
         self.criterion = criterion
         self.init_cond = init_cond
         self.step_count = 0
-        self.communities = set() # or list()
+        self.communities = list()
         self.agent_reporter = {'group_id': lambda c: c.id,
                                'n_event': lambda c: c.n_event,
                                'group_size': lambda c: c.N,
@@ -376,30 +393,55 @@ class EvoOpinionModel():
         if load_communities is not None:
             self.communities = load_communities
         else:
-            for i in range(self.np):
-                self.communities.add(Community(unique_id=i,
-                                               N=self.init_n,
-                                               x_threshold=self.x_threshold,
-                                               k=self.k,
-                                               lim_speakers=self.lim_speakers,
-                                               lim_listeners=self.lim_listeners,
-                                               mu_rate=self.mu_rate,
-                                               alpha_var=self.alpha_var,
-                                               K=self.K,
-                                               ra=self.ra,
-                                               gammar=self.gammar,
-                                               betar=self.betar,
-                                               gammab=self.gammab,
-                                               betab=self.betab,
-                                               S=self.S,
-                                               b_mid=self.b_mid,
-                                               Ct=self.Ct,
-                                               d=self.d,
-                                               criterion=self.criterion,
-                                               init_cond=self.init_cond))
+            init_cond_set = ['uniform', 'most_leaders', 'most_followers', 'left_skew', 'right_skew']
+            if self.init_cond == 'randomized':
+                init_conds = np.random.choice(init_cond_set, self.ng)
+            elif self.init_cond == 'even':
+                ng_per_cond = int(np.ceil(self.ng / 5))
+                res = self.ng % 5
+                init_conds = []
+                if res == 0:
+                    for i in range(5):
+                        init_conds.extend([init_cond_set[i]] * ng_per_cond)
+                else:
+                    for i in range(res):
+                        init_conds.extend([init_cond_set[i]] * ng_per_cond)
+                    for i in range(res, 5):
+                        init_conds.extend([init_cond_set[i]] * (ng_per_cond - 1))
+            elif self.init_cond in init_cond_set:
+                init_conds = [self.init_cond] * self.ng
+            else:
+                init_conds = []
+                cond_num = self.init_cond.split(',')
+                for i in range(5):
+                    init_conds.extend([init_cond_set[i]] * int(cond_num[i]))
+
+            print(init_conds)
+
+            for i in range(self.ng):
+                self.communities.append(Community(unique_id=i,
+                                                  N=self.init_n,
+                                                  x_threshold=self.x_threshold,
+                                                  k=self.k,
+                                                  lim_speakers=self.lim_speakers,
+                                                  lim_listeners=self.lim_listeners,
+                                                  mu_rate=self.mu_rate,
+                                                  alpha_var=self.alpha_var,
+                                                  K=self.K,
+                                                  ra=self.ra,
+                                                  gammar=self.gammar,
+                                                  betar=self.betar,
+                                                  gammab=self.gammab,
+                                                  betab=self.betab,
+                                                  S=self.S,
+                                                  b_mid=self.b_mid,
+                                                  Ct=self.Ct,
+                                                  d=self.d,
+                                                  criterion=self.criterion,
+                                                  init_cond=init_conds[i]))
 
     # Model time step
-    def step(self, capped_pop=False, verbose=False, process_num=1):
+    def step(self, fixed_pop=False, verbose=False, process_num=1):
 
         self.form_decision(verbose=verbose, process_num=process_num)
         self.step_count += 1
@@ -408,13 +450,14 @@ class EvoOpinionModel():
         for key, collect_func in self.agent_reporter.items():
             self.datacollector[key].extend(list(map(collect_func, self.communities)))
 
-        self.datacollector['step'].extend([self.step_count] * self.np)
+        self.datacollector['step'].extend([self.step_count] * self.ng)
 
-        self.reproduce(process_num=process_num)
+        if fixed_pop:
+            self.rescale_pop(process_num=process_num)
+        else:
+            self.reproduce(process_num=process_num)
+
         self.migrate()
-
-        if capped_pop:
-            self.rescale_pop()
 
     def form_decision(self, verbose=False, process_num=1):
 
@@ -459,86 +502,153 @@ class EvoOpinionModel():
         for community in self.communities:
             community.reset_opinion()
 
-    def migrate(self):
+    def migrate(self, fixed_popsize=False):
 
         # Migration step
-        if self.np > 1 and self.m is not None:
-            list_com = list(self.communities)
+        if self.ng > 1 and self.m is not None:
             c_migrants = []
             # prem_pop_dict = {}
             # groupm_dict = {}
 
-            ## sample migrants from all communities
-            for i in range(self.np):
-                community = list_com[i]
-                pop_ids = np.arange(len(community.population))
-                # prem_pop_dict[i] = len(community.population) # group size for each community
-                m_masks = np.random.binomial(size=pop_ids.shape[0], n=1, p=self.m)
-                m_ids = pop_ids[m_masks == 1]
+            ## migrate agents so that the size of all groups stay constant
+            if fixed_popsize == 'all_groups':
 
-                # list of each group's migrants (list within list)
-                c_migrants.append([community.population.pop(m_id) for m_id in reversed(m_ids)])
-                # groupm_dict[i] = len(c_migrants[i])
+                ## sample migrants from all communities
+                for i in range(self.ng):
+                    community = self.communities[i]
+                    cur_n = len(community.population)
 
-            ## assign patches to all migrants
-            c_ids = np.arange(self.np)
-            # mto_list = []
-            for i in range(self.np):
-                new_c_ids = np.random.choice(c_ids[c_ids != i], size=len(c_migrants[i]), replace=True)
-                # mto_list.extend(new_c_ids)
+                    if cur_n > self.init_n:
+                        num_migrant = (cur_n - self.init_n) + int(self.init_n * self.m)
+                    else:
+                        num_migrant = int(cur_n * self.m)
 
-                for c_id in new_c_ids:
-                    list_com[c_id].population.append(c_migrants[i].pop(0))
+                    pop_ids = np.arange(len(community.population))
+                    m_ids = np.random.choice(pop_ids, size=num_migrant, replace=False)
+                    m_ids[::-1].sort() # sort id in descending order
 
-            # mto_dict = dict(sorted(Counter(mto_list).items()))
+                    # list of each group's migrants (list within list)
+                    c_migrants.extend([community.population.pop(m_id) for m_id in m_ids])
+
+                    community.N = len(community.population)
+
+                ## assign communities to all migrants
+                c_migrants = np.array(c_migrants)
+                for i in range(self.ng):
+                    community = self.communities[i]
+                    new_memb_num = self.init_n - community.N
+
+                    m_ids = np.arange(len(c_migrants))
+
+                    # fill up community i with new members from random migrants
+                    # print('migrant index length =', len(m_ids))
+                    new_memb_ids = np.random.choice(m_ids, size=new_memb_num, replace=False)
+                    community.population.extend(c_migrants[new_memb_ids])
+
+                    # assign new community id
+                    for m_id in new_memb_ids:
+                        c_migrants[m_id].cid = i
+
+                    # remove already-assigned migrants
+                    mask = np.ones(len(m_ids), dtype=bool)
+                    mask[new_memb_ids] = False
+                    c_migrants = c_migrants[mask]
+
+            else:
+                ## sample migrants from all communities
+                for i in range(self.ng):
+                    community = self.communities[i]
+                    pop_ids = np.arange(len(community.population))
+                    m_masks = np.random.binomial(size=pop_ids.shape[0], n=1, p=self.m)
+                    m_ids = pop_ids[m_masks == 1]
+
+                    # list of each group's migrants (list within list)
+                    c_migrants.append([community.population.pop(m_id) for m_id in reversed(m_ids)])
+
+                ## assign communities to all migrants
+                c_ids = np.arange(self.ng)
+                for i in range(self.ng):
+                    # randomize a new community for migrants from community i
+                    new_c_ids = np.random.choice(c_ids[c_ids != i], size=len(c_migrants[i]), replace=True)
+
+                    for c_id in new_c_ids:
+                        c_migrant = c_migrants[i].pop(0)
+                        c_migrant.cid = c_id
+                        self.communities[c_id].population.append(c_migrant)
+
 
             ## update group size
-            # postm_pop_dict = {}
             for i, c in enumerate(self.communities):
                 c.N = len(c.population)
-                # postm_pop_dict[i] = c.N
 
-            # print('Pre-migration size = ', prem_pop_dict)
-            # print('Migrants from each group = ', groupm_dict)
-            # print('Migrants to each group = ', mto_dict)
-            # print('Post-migration size = ', postm_pop_dict)
 
     # rescaling total population to a fixed size
     def rescale_pop(self, process_num=1):
 
-        fixed_n = self.init_n * self.np
-        total_n = 0
+        fixed_n = self.init_n * self.ng
+
+        # initiate multicore-processing pool
+        if process_num > 1:
+            pool = mp.Pool(processes=process_num)
+
+        # Reproduction step
+        if process_num == 1:
+            for community in self.communities:
+                community.die(death_rate=self.dr)
+        else:
+            for community in self.communities:
+                pool.apply_async(community.die(self.dr))
+
+            pool.close()
+            pool.join()
+
+        meta_pop = []
 
         for community in self.communities:
-            total_n += community.N
+            meta_pop += community.population
 
-        print('Pre-rescaling population size = ', total_n)
+        cur_n = len(meta_pop)
+        birth_n = fixed_n - cur_n
 
-        if fixed_n < total_n:
+        meta_w = []
+        for agent in meta_pop:
+            meta_w.append(agent.w)
 
-            rescaled_coef = fixed_n / total_n
-            print(rescaled_coef)
+        reproduce_prob = meta_w / np.sum(meta_w)
 
-            # initiate multicore-processing pool
-            if process_num > 1:
-                pool = mp.Pool(processes=process_num)
+        # sample parents in proportion to their fitness
+        parents = np.random.choice(meta_pop, size=birth_n, replace=True, p=reproduce_prob)
 
-            # Reproduction step
-            if process_num == 1:
-                for community in self.communities:
-                    community.die(survive_prob=rescaled_coef)
-            else:
-                for community in self.communities:
-                    pool.apply_async(community.die(rescaled_coef))
+        # Reproduction proportional to fitness
+        for par_id, parent in enumerate(parents):
+            cid = parent.cid
 
-                pool.close()
-                pool.join()
+            offspring_tmp = OpinionAgent(alpha=parent.alpha,
+                                         opinion=parent.opinion,
+                                         cid=cid,
+                                         cd=parent.con_dist,
+                                         w=parent.w)
 
-            tmp_n = 0
-            for community in self.communities:
-                tmp_n += community.N
+            self.communities[cid].population.append(offspring_tmp)
 
-            print('Post-rescaling pop = ', tmp_n)
+        # reset opinions and update group size
+        new_meta_pop = []
+
+        for community in self.communities:
+            new_meta_pop += community.population
+            community.N = len(community.population)
+            community.reset_opinion()
+
+        # alpha mutation
+        mutation_masks = np.random.choice([0, 1], p=[1 - self.mu_rate, self.mu_rate], size=fixed_n)
+
+        alpha_std = np.sqrt(self.alpha_var)
+
+        for _id, agent in enumerate(new_meta_pop):
+            if mutation_masks[_id]:
+                # adjusted truncated thresholds
+                a, b = (0 - agent.alpha) / alpha_std, (1 - agent.alpha) / alpha_std
+                agent.alpha = truncnorm.rvs(a, b, loc=agent.alpha, scale=alpha_std, size=1)[0]
 
 
     def save_communities(self, filepath):

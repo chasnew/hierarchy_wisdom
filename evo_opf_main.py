@@ -166,26 +166,24 @@ if __name__ == '__main__':
         # fixed_popsize can be "all_groups" to keep all groups at a constant size
         evo_model.migrate(fixed_popsize)
 
-    if start_gen == 0:
-        filename = 'modsep_ct{}_{}_alpha_sim{}.npy'.format(fixed_params['Ct'],
-                                                           crit_abbv, sim_num)
-        with open(os.path.join(result_path, filename), 'wb') as file:
-            np.save(file, np.array(alpha_sep_hists))
+    # initial condition string for file names
+    file_initc = ''
 
-        filename = 'modpool_ct{}_{}_alpha_sim{}.npy'.format(fixed_params['Ct'],
-                                                            crit_abbv, sim_num)
-        with open(os.path.join(result_path, filename), 'wb') as file:
-            np.save(file, np.array(alpha_pool_hists))
-    else:
-        filename = 'modsep_ct{}_{}_alpha{}_sim{}.npy'.format(fixed_params['Ct'],
-                                                             crit_abbv, start_gen, sim_num)
-        with open(os.path.join(result_path, filename), 'wb') as file:
-            np.save(file, np.array(alpha_sep_hists))
+    if isinstance(fixed_params['init_cond'], str):
+        file_initc = fixed_params['init_cond']
+    elif isinstance(fixed_params['init_cond'], list):  # given specific alpha and beta parameter values
+        file_initc = 'a{}b{}'.format(fixed_params['init_cond'][0],
+                                     fixed_params['init_cond'][1])
 
-        filename = 'modpool_ct{}_{}_alpha{}_sim{}.npy'.format(fixed_params['Ct'],
-                                                              crit_abbv, start_gen, sim_num)
-        with open(os.path.join(result_path, filename), 'wb') as file:
-            np.save(file, np.array(alpha_pool_hists))
+    filename = 'modsep_ct{}_{}_{}_alpha_sim{}.npy'.format(fixed_params['Ct'],
+                                                       crit_abbv, file_initc, sim_num)
+    with open(os.path.join(result_path, filename), 'wb') as file:
+        np.save(file, np.array(alpha_sep_hists))
+
+    filename = 'modpool_ct{}_{}_{}_alpha_sim{}.npy'.format(fixed_params['Ct'],
+                                                        crit_abbv, file_initc, sim_num)
+    with open(os.path.join(result_path, filename), 'wb') as file:
+        np.save(file, np.array(alpha_pool_hists))
 
     if consensus_dist:
         cum_cd_df = pd.concat(cum_cd_pool).reset_index(drop=True)
@@ -212,12 +210,8 @@ if __name__ == '__main__':
     print(community_data.iloc[:10, :])
 
     # save data
-    if start_gen == 0:
-        filename = 'modevo_ct{}_{}_results_sim{}.csv'.format(fixed_params['Ct'],
-                                                             crit_abbv, sim_num)
-    else:
-        filename = 'modevo_ct{}_{}_results{}_sim{}.csv'.format(fixed_params['Ct'],
-                                                               crit_abbv, start_gen, sim_num)
+    filename = 'modevo_ct{}_{}_{}_results_sim{}.csv'.format(fixed_params['Ct'],
+                                                         crit_abbv, file_initc, sim_num)
 
     result_file = os.path.join(result_path, filename)
     community_data.to_csv(result_file, index=False)

@@ -35,7 +35,12 @@ class Community():
     """
     def __init__(self, unique_id, N, x_threshold, k, lim_speakers, lim_listeners,
                  mu_rate, alpha_var, K, ra, gammar, betar, gammab, betab, S,
-                 b_mid, Ct, d, criterion, init_cond):
+                 b_mid, Ct, d, criterion, init_cond, speak_prob, lead_clust=False):
+
+        # rescale base payoff for cases when slow decision is favored
+        if Ct < 0:
+            betab = 0
+
         self.id = unique_id
         self.N = N
         self.x_threshold = x_threshold
@@ -56,9 +61,13 @@ class Community():
         self.d = d
         self.criterion = criterion
         self.init_cond = init_cond
+        self.speak_prob = speak_prob
+        self.lead_clust = lead_clust
 
         self.n_event = 0
         self.Bt = 0 # additional resource produced by group
+
+        self.sp_influence = []
 
         # create a population of agents
         self.population = self.create_population(self.init_cond)
@@ -67,46 +76,60 @@ class Community():
         population = []
 
         if init_cond == 'uniform':
-            for i in range(self.N):
-                population.append(OpinionAgent(alpha=np.random.rand(),
-                                               opinion=np.random.rand(),
-                                               cid=self.id))
+            alphas = np.random.rand(self.N)
         elif init_cond == 'most_leaders':
-            for i in range(self.N):
-                population.append(OpinionAgent(alpha=np.random.beta(a=1.9,b=0.1,size=1)[0],
-                                               opinion=np.random.rand(),
-                                               cid=self.id))
+            alphas = np.random.beta(a=1.9,b=0.1,size=self.N)
         elif init_cond == 'most_followers':
-            for i in range(self.N):
-                population.append(OpinionAgent(alpha=np.random.beta(a=0.1,b=1.9,size=1)[0],
-                                               opinion=np.random.rand(),
-                                               cid=self.id))
+            alphas = np.random.beta(a=0.1, b=1.9, size=self.N)
         elif init_cond == 'left_skew':
-            for i in range(self.N):
-                population.append(OpinionAgent(alpha=np.random.beta(a=1.5,b=0.5,size=1)[0],
-                                               opinion=np.random.rand(),
-                                               cid=self.id))
+            alphas = np.random.beta(a=1.5, b=0.5, size=self.N)
         elif init_cond == 'right_skew':
-            for i in range(self.N):
-                population.append(OpinionAgent(alpha=np.random.beta(a=0.5,b=1.5,size=1)[0],
-                                               opinion=np.random.rand(),
-                                               cid=self.id))
+            alphas = np.random.beta(a=0.5, b=1.5, size=self.N)
+        elif isinstance(init_cond, list):
+            a = init_cond[0]
+            b = init_cond[1]
+            alphas = np.random.beta(a=a, b=b, size=self.N)
+
+        # High influence agents have opinions that are more clustered together
+        if self.lead_clust:
+            opinions = [np.random.rand() if np.random.binomial(1,alphas[i],size=1)
+                        else np.random.uniform(0.5, 1)
+                        for i in range(self.N)]
+        else:
+            opinions = np.random.rand(self.N)
+
+        for i in range(self.N):
+            population.append(OpinionAgent(alpha=alphas[i],
+                                           opinion=opinions[i],
+                                           cid=self.id))
 
         return population
 
     def calc_talk_prob(self):
-        speak_probs = np.zeros(self.N)
-        speak_denom = 0
-        for j, agent in enumerate(self.population):
-            speak_val = np.power(agent.alpha, self.k)
-            speak_probs[j] = speak_val
-            speak_denom += speak_val
-        speak_probs = speak_probs / speak_denom
+        if self.speak_prob == 'uniform':
+            speak_probs = np.ones(self.N) / self.N
+        else:
+            speak_probs = np.zeros(self.N)
+            speak_denom = 0
+            for j, agent in enumerate(self.population):
+                speak_val = np.power(agent.alpha, self.k)
+                speak_probs[j] = speak_val
+                speak_denom += speak_val
+            speak_probs = speak_probs / speak_denom
 
         return speak_probs
 
-    def mean_opinion(self):
-        return np.mean([agent.opinion for agent in self.population])
+    def final_decision(self):
+        if self.criterion == 'sd_threshold':
+            return np.mean([agent.opinion for agent in self.population])
+        elif self.criterion == 'prop_threshold':
+            opi_array = np.array([agent.opinion for agent in self.population])
+            left_opi_masks = (opi_array < 0.5) # boolean masks for opinions on the left
+            c_prop = np.mean(left_opi_masks) # proportion of opinions on the left
+            if c_prop > 1-c_prop:
+                return np.mean(opi_array[left_opi_masks])
+            else:
+                return np.mean(opi_array[~left_opi_masks])
 
     def sd_opinion(self):
         return np.std([agent.opinion for agent in self.population])
@@ -165,12 +188,13 @@ class Community():
     def make_decision(self):
         np.random.seed()
 
-        self.speak_probs = self.calc_talk_prob()
+        speak_probs = self.calc_talk_prob()
 
         pop_inds = np.arange(len(self.population))
         init_opinions = np.array([agent.opinion for agent in self.population])
 
         self.n_event = 0
+        self.sp_influence = []
 
         while(not self.check_consensus(criterion=self.criterion)):
 
@@ -181,7 +205,7 @@ class Community():
                 speaker_num = len(self.population) - self.lim_listeners
 
             # select speaker(s)
-            speaker_inds = np.random.choice(pop_inds, p=self.speak_probs,
+            speaker_inds = np.random.choice(pop_inds, p=speak_probs,
                                             size=speaker_num, replace=False)
 
             # average speaker opinions and influence of multiple speakers
@@ -207,7 +231,7 @@ class Community():
                 speaker_position = self.population[speaker_ind].opinion
 
             non_speaker_masks = np.ones(len(self.population), np.bool)
-            non_speaker_masks[speaker_inds] = 0
+            non_speaker_masks[speaker_inds] = 0 # change speakers' masks to False (0)
 
             # select listeners
             listener_inds = np.random.choice(pop_inds[non_speaker_masks],
@@ -229,7 +253,12 @@ class Community():
                 listener.opinion = listener.opinion + (alpha_diff * opinion_diff)
 
             self.n_event += 1
-            # print(self.sd_opinion())
+            self.sp_influence.append(speaker_influence)
+
+            # if (self.n_event % 100) == 0:
+            #     print('Community {}, Turn {}'.format(self.id, self.n_event))
+            #     print('speaker position = {}, influrnce = {}'.format(speaker_position, speaker_influence))
+            #     print('opinion mean = {}, sd = {}'.format(self.final_decision(), self.sd_opinion()))
 
         # Calculate additional resource produced by the group (group-level payoff)
         prev_Bt = self.Bt
@@ -239,7 +268,7 @@ class Community():
         self.Bt = max(0, self.Bt)
 
         # Calculate the share of resources each individual receives
-        con_diff = np.abs(init_opinions - self.mean_opinion())
+        con_diff = np.abs(init_opinions - self.final_decision())
         alphar = 1 - con_diff
 
         pt = (1 + (self.d * alphar))
@@ -341,11 +370,8 @@ class EvoOpinionModel():
     """
     def __init__(self, init_n, x_threshold, k, lim_speakers, lim_listeners, ng, mu_rate, alpha_var,
                  K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, d, m, dr=0,
-                 criterion='sd_threshold', init_cond='uniform', load_communities=None):
-
-        # rescale base payoff for cases when slow decision is favored
-        if Ct < 0:
-            betab = 0
+                 criterion='sd_threshold', init_cond='uniform', speak_prob='non_uniform', lead_clust=False,
+                 load_communities=None):
 
         self.init_n = init_n
         self.x_threshold = x_threshold
@@ -376,7 +402,7 @@ class EvoOpinionModel():
                                'group_size': lambda c: c.N,
                                # 'extra_resource': lambda c: c.Bt,
                                # 'avg_fitness': lambda c: c.mean_fitness(),
-                               'mean_opinion': lambda c: c.mean_opinion(),
+                               'final_decision': lambda c: c.final_decision(),
                                'avg_alpha': lambda c: c.mean_influence(),
                                'alpha_skewness': lambda c: c.influence_skewness()}
         if criterion == 'prop_threshold':
@@ -388,6 +414,24 @@ class EvoOpinionModel():
                                         'majority_side': lambda c: c.majority_side()})
         self.datacollector = {key: [] for key in self.agent_reporter.keys()}
         self.datacollector['step'] = []
+
+        # different communities subject to different time constraints (even split)
+        if Ct == 'even':
+            each_init_n = self.ng / 5
+            ct_set = ([-3] * int(each_init_n / 2)) + ([3] * int(each_init_n - int(each_init_n / 2)))
+            Cts = ct_set * 5
+        elif Ct == 'most_fast':
+            slow_n = int(self.ng * 0.1)
+            slow_inds = np.random.choice(list(range(self.ng)), size=slow_n)
+            Cts = [-3 if i in slow_inds else 3 for i in range(self.ng)]
+        elif Ct == 'most_slow':
+            fast_n = int(self.ng * 0.1)
+            fast_inds = np.random.choice(list(range(self.ng)), size=fast_n)
+            Cts = [3 if i in fast_inds else -3 for i in range(self.ng)]
+        else:
+            Cts = [self.Ct] * self.ng
+
+        # print('Ct list =', Cts)
 
         # initialize communities
         if load_communities is not None:
@@ -408,15 +452,15 @@ class EvoOpinionModel():
                         init_conds.extend([init_cond_set[i]] * ng_per_cond)
                     for i in range(res, 5):
                         init_conds.extend([init_cond_set[i]] * (ng_per_cond - 1))
-            elif self.init_cond in init_cond_set:
+            elif self.init_cond in init_cond_set: # same initial condition for all groups
                 init_conds = [self.init_cond] * self.ng
-            else:
+            elif isinstance(self.init_cond, list): # given specific alpha and beta parameter values
+                init_conds = [self.init_cond] * self.ng
+            else: # assign specific initial condition by index
                 init_conds = []
                 cond_num = self.init_cond.split(',')
                 for i in range(5):
                     init_conds.extend([init_cond_set[i]] * int(cond_num[i]))
-
-            print(init_conds)
 
             for i in range(self.ng):
                 self.communities.append(Community(unique_id=i,
@@ -435,10 +479,12 @@ class EvoOpinionModel():
                                                   betab=self.betab,
                                                   S=self.S,
                                                   b_mid=self.b_mid,
-                                                  Ct=self.Ct,
+                                                  Ct=Cts[i],
                                                   d=self.d,
                                                   criterion=self.criterion,
-                                                  init_cond=init_conds[i]))
+                                                  init_cond=init_conds[i],
+                                                  speak_prob=speak_prob,
+                                                  lead_clust=lead_clust))
 
     # Model time step
     def step(self, fixed_pop=False, verbose=False, process_num=1):
@@ -457,7 +503,7 @@ class EvoOpinionModel():
         else:
             self.reproduce(process_num=process_num)
 
-        self.migrate()
+        self.migrate(fixed_popsize=fixed_pop)
 
     def form_decision(self, verbose=False, process_num=1):
 

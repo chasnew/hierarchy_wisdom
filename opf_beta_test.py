@@ -8,7 +8,7 @@ import multiprocessing as mp
 def simulate_consensus(params, n_iter=5000, print_interval=None):
     np.random.seed()
 
-    sim_result = {'a': [], 'b': [], 'n_event': []}
+    sim_result = {'a': [], 'b': [], 'n_event': [], 'sp_influence': []}
     print('initial condition =', params['init_cond'])
     for i in range(n_iter):
 
@@ -24,6 +24,8 @@ def simulate_consensus(params, n_iter=5000, print_interval=None):
         sim_result['n_event'].append(evo_model.communities[0].n_event)
         sim_result['a'].append(evo_model.init_cond[0])
         sim_result['b'].append(evo_model.init_cond[1])
+
+        sim_result['sp_influence'].extend(evo_model.communities[0].sp_influence)
 
         evo_model.reset_opinion()
 
@@ -79,8 +81,8 @@ if __name__ == '__main__':
     print_interval = 1
     process_num = 1  # int(sys.argv[1])
 
-    a_beta = [0.1] #np.linspace(0.1, 2, num=5)
-    b_beta = [2] #np.linspace(0.1, 2, num=5)
+    a_beta = np.linspace(0.1, 2, num=20)
+    b_beta = np.linspace(0.1, 2, num=20)
 
     param_list = []
     for a in a_beta:
@@ -110,13 +112,15 @@ if __name__ == '__main__':
 
 
     # retrieve model-level results
-    print(tmp_results)
-    print(len(tmp_results))
+    # print(tmp_results)
+    print(len(tmp_results)) # the number of all param combinations
     combined_results = {'a': [], 'b': [], 'n_event': []}
+    sp_influence_results = []
     for i in range(len(tmp_results)):
         combined_results['a'].extend(tmp_results[i]['a'])
         combined_results['b'].extend(tmp_results[i]['b'])
         combined_results['n_event'].extend(tmp_results[i]['n_event'])
+        # sp_influence_results.extend(tmp_results[i]['sp_influence'])
 
     step_data = pd.DataFrame(combined_results)
     agg_results = step_data.groupby(['a', 'b']).agg({'n_event': ['mean', 'std']})
@@ -131,5 +135,11 @@ if __name__ == '__main__':
 
     result_file = os.path.join(result_path, filename)
     decisiont_df.to_csv(result_file, index=False)
+
+
+    # sp_inf_name = 'speaker_influence_a{}b{}.csv'.format(a_beta[0], b_beta[0])
+    # sp_inf_file = os.path.join(result_path, sp_inf_name)
+    # sp_influence_results = pd.DataFrame({'sp_influence': sp_influence_results})
+    # sp_influence_results.to_csv(sp_inf_file, index=False)
 
     print('simulation is complete.')

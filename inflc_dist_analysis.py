@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import scipy
+import yaml
 
 sim = 1
 ct = 3
@@ -9,14 +10,15 @@ fixed_popsize = "all_groups"
 criterion = 'prop'
 init_cond = 'most_followers'
 
+with open('evo_opf_config.yaml') as file:
+    config_params = yaml.safe_load(file)
+
 for sim in range(1,6):
     print('sim', sim)
 
-    box_path = '/Users/chanuwasaswamenakul/Library/CloudStorage/Box-Box'
-    result_path = os.path.join(box_path, 'HierarchyWisdom', 'results',
-                               'modevo_ct{}_{}_{}_results_sim{}.csv'.format(ct, criterion, init_cond, sim))
-    alpha_path = os.path.join(box_path, 'HierarchyWisdom', 'results',
-                              'modpool_ct{}_{}_{}_alpha_sim{}.npy'.format(ct, criterion, init_cond, sim))
+    box_path = config_params['result_path']
+    result_path = os.path.join(box_path, 'modevo_ct{}_{}_{}_results_sim{}.csv'.format(ct, criterion, init_cond, sim))
+    alpha_path = os.path.join(box_path, 'modpool_ct{}_{}_{}_alpha_sim{}.npy'.format(ct, criterion, init_cond, sim))
 
     result_df = pd.read_csv(result_path)
     ng = result_df['group_id'].nunique()
@@ -36,8 +38,7 @@ for sim in range(1,6):
     beta_df = pd.DataFrame(beta_results)
     beta_df['step'] = list(range(alpha_raw.shape[0]))
 
-    beta_df.to_csv(os.path.join(box_path, 'HierarchyWisdom', 'results',
-                                'global_beta_ct{}_{}_{}_sim{}.csv'.format(ct, criterion, init_cond, sim)),
+    beta_df.to_csv(os.path.join(box_path, 'global_beta_ct{}_{}_{}_sim{}.csv'.format(ct, criterion, init_cond, sim)),
                    index=False)
     print('complete saving.')
 
@@ -45,8 +46,7 @@ for sim in range(1,6):
 
 
 # alpha distributions for each separate group
-alphasep_path = os.path.join(box_path, 'HierarchyWisdom', 'results',
-                             'modsep_ct{}_{}_{}_alpha_sim{}.npy'.format(ct, criterion, init_cond, sim))
+alphasep_path = os.path.join(box_path, 'modsep_ct{}_{}_{}_alpha_sim{}.npy'.format(ct, criterion, init_cond, sim))
 
 concat_group_alpha = np.load(alphasep_path, allow_pickle=True)
 
@@ -80,8 +80,7 @@ for i in range(ng):
 
 gbeta_df = pd.DataFrame(gbeta_results)
 
-gbeta_df.to_csv(os.path.join(box_path, 'HierarchyWisdom', 'results',
-                             'group_beta_ct{}_{}_sim{}.csv'.format(ct, criterion, sim)),
+gbeta_df.to_csv(os.path.join(box_path, 'group_beta_ct{}_{}_sim{}.csv'.format(ct, criterion, sim)),
                 index=False)
 
 print('complete processing and saving.')

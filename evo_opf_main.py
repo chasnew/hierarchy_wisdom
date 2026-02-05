@@ -95,7 +95,7 @@ if __name__ == '__main__':
 
         for c in evo_model.communities:
 
-            if consensus_dist:
+            if consensus_dist: # tracking distance to consensus for internal investigation
                 alpha_list = []
                 cd_list = []
                 mv_list = []
@@ -108,7 +108,7 @@ if __name__ == '__main__':
                 alpha_pool.extend(alpha_list)
                 cd_pool.extend(cd_list)
                 mv_pool.extend(mv_list)
-            elif track_fitness:
+            elif track_fitness: # tracking individual fitness for internal investigation
                 alpha_list = []
                 w_list = []
                 for agent in c.population:
@@ -122,8 +122,7 @@ if __name__ == '__main__':
                 alpha_list = [agent.alpha for agent in c.population]
                 alpha_pool.extend(alpha_list)
 
-
-
+            # storing histograms of influence for each group separately
             if (i % sephist_step) == 0:
                 if fixed_popsize == "all_groups":
                     alpha_sep_hists.append(np.array(alpha_list))
@@ -134,14 +133,13 @@ if __name__ == '__main__':
 
 
 
-        if consensus_dist:
+        if consensus_dist: # tracking distance to consensus for model investigation
             tmp_cd = pd.DataFrame({'alpha': alpha_pool, 'con_dist': cd_pool, 'mv_dist': mv_pool, 'step': i})
             tmp_cd['alpha_bin'] = tmp_cd['alpha'].map(lambda alpha: int(np.floor(alpha / 0.1)) if alpha != 1 else 9)
             tmp_agg_cd = tmp_cd.groupby('alpha_bin').agg({'con_dist': 'mean', 'mv_dist': 'mean',
                                                           'step': 'first'}).reset_index()
             cum_cd_pool.append(tmp_agg_cd)
-        elif track_fitness:
-            # need to track fitness in parent's generation
+        elif track_fitness: # tracking individual fitness for model investigation
             tmp_w = pd.DataFrame({'alpha': alpha_pool, 'w': w_pool, 'step': i})
             tmp_w['alpha_bin'] = tmp_w['alpha'].map(lambda alpha: int(np.floor(alpha / 0.1)) if alpha != 1 else 9)
             tmp_agg_w = tmp_w.groupby('alpha_bin').agg({'w': ['mean', 'count'], 'step': 'first'}).reset_index()
@@ -156,8 +154,6 @@ if __name__ == '__main__':
             alpha_pool_hists.append(alpha_hist)
 
         # Reproduction and Migration
-        # evo_model.reset_opinion()
-
         if fixed_popsize:
             evo_model.rescale_pop(process_num=process_num)
         else:

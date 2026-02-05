@@ -273,6 +273,7 @@ class Community():
         pt = pt/np.sum(pt)
 
         # Calculate additional growth rate for each individual
+        # Self.S was set to 0 in the simulations for the paper
         rb = self.betar * (1 - np.exp(-self.gammar * ((self.Bt + (self.S * prev_Bt)) * pt)))
         rb[ rb < 0 ] = 0
 
@@ -355,7 +356,9 @@ class EvoOpinionModel():
     betar: max increase in growth rate induced by extra resources
     gammab: steepness of increase in benefit induced by participants
     betab: max increase in benefit induced by number of participants
-    S: the benefit that will inherit to the next generation
+    S: the payoff that will inherit to the next generation
+        this parameter was set to 0 in the simulations for the paper but
+        interested readers can set this to positive value [0,1] to explore the mechanism.
     b_mid: group size at the sigmoid's midpoint (sigmoid parameter)
     Ct: time constraints on group consensus building
     q: ecological inequality

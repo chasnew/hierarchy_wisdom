@@ -35,7 +35,7 @@ class Community():
     """
     def __init__(self, unique_id, N, x_threshold, k, lim_speakers, lim_listeners,
                  mu_rate, alpha_var, K, ra, gammar, betar, gammab, betab, S,
-                 b_mid, Ct, d, criterion, init_cond, speak_prob, lead_clust=False):
+                 b_mid, Ct, q, criterion, init_cond, lead_type, lead_clust=False):
 
         # rescale base payoff for cases when slow decision is favored
         if Ct < 0:
@@ -58,10 +58,10 @@ class Community():
         self.S = S
         self.b_mid = b_mid
         self.Ct = Ct
-        self.d = d
+        self.q = q
         self.criterion = criterion
         self.init_cond = init_cond
-        self.speak_prob = speak_prob
+        self.lead_type = lead_type
         self.lead_clust = lead_clust
 
         self.n_event = 0
@@ -106,16 +106,14 @@ class Community():
         return population
 
     def calc_talk_prob(self):
-        if self.speak_prob == 'uniform':
-            speak_probs = np.ones(self.N) / self.N
-        else:
-            speak_probs = np.zeros(self.N)
-            speak_denom = 0
-            for j, agent in enumerate(self.population):
-                speak_val = np.power(agent.alpha, self.k)
-                speak_probs[j] = speak_val
-                speak_denom += speak_val
-            speak_probs = speak_probs / speak_denom
+        # speak_probs is uniform when self.k = 0
+        speak_probs = np.zeros(self.N)
+        speak_denom = 0
+        for j, agent in enumerate(self.population):
+            speak_val = np.power(agent.alpha, self.k)
+            speak_probs[j] = speak_val
+            speak_denom += speak_val
+        speak_probs = speak_probs / speak_denom
 
         return speak_probs
 
@@ -243,7 +241,7 @@ class Community():
 
                 # calculate difference in influence
                 alpha_diff = speaker_influence - listener.alpha
-                if alpha_diff <= 0:
+                if (self.lead_type != 'persuasive') or (alpha_diff <= 0):
                     alpha_diff = 0.01
 
                 # calculate difference in opinion
@@ -271,7 +269,7 @@ class Community():
         con_diff = np.abs(init_opinions - self.final_decision())
         alphar = 1 - con_diff
 
-        pt = (1 + (self.d * alphar))
+        pt = (1 + (self.q * alphar))
         pt = pt/np.sum(pt)
 
         # Calculate additional growth rate for each individual
@@ -360,7 +358,7 @@ class EvoOpinionModel():
     S: the benefit that will inherit to the next generation
     b_mid: group size at the sigmoid's midpoint (sigmoid parameter)
     Ct: time constraints on group consensus building
-    d: ecological inequality
+    q: ecological inequality
     m: migration rate
     dr: death rate
     criterion: decision rule for the groups (either based on sd threshold or proportional threshold)
@@ -369,8 +367,8 @@ class EvoOpinionModel():
         where user wants to resume the simulation
     """
     def __init__(self, init_n, x_threshold, k, lim_speakers, lim_listeners, ng, mu_rate, alpha_var,
-                 K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, d, m, dr=0,
-                 criterion='sd_threshold', init_cond='uniform', speak_prob='non_uniform', lead_clust=False,
+                 K, ra, gammar, betar, gammab, betab, S, b_mid, Ct, q, m, dr=0,
+                 criterion='sd_threshold', init_cond='uniform', lead_type='persuasive', lead_clust=False,
                  load_communities=None):
 
         self.init_n = init_n
@@ -390,11 +388,12 @@ class EvoOpinionModel():
         self.S = S
         self.b_mid = b_mid
         self.Ct = Ct
-        self.d = d
+        self.q = q
         self.m = m
         self.dr = dr
         self.criterion = criterion
         self.init_cond = init_cond
+        self.lead_type = lead_type
         self.step_count = 0
         self.communities = list()
         self.agent_reporter = {'group_id': lambda c: c.id,
@@ -480,10 +479,10 @@ class EvoOpinionModel():
                                                   S=self.S,
                                                   b_mid=self.b_mid,
                                                   Ct=Cts[i],
-                                                  d=self.d,
+                                                  d=self.q,
                                                   criterion=self.criterion,
                                                   init_cond=init_conds[i],
-                                                  speak_prob=speak_prob,
+                                                  lead_type=lead_type,
                                                   lead_clust=lead_clust))
 
     # Model time step

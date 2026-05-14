@@ -34,111 +34,14 @@ for (i in 1:length(init_cond_labels)) {
   init_hist_list[[i]] <- dist_plot
 }
 
-plot_grid(init_hist_list[[1]], init_hist_list[[2]], init_hist_list[[3]], init_hist_list[[4]],
-          init_hist_list[[5]], init_hist_list[[6]], init_hist_list[[7]], ncol = 4)
-
-ggsave(file.path(wd_result_path,
-                 "init_distributions.jpg"),
-       height = 6, width = 12)
-
-
-
-# End state of influence distribution
-
-init_cond_list <- c("most_leaders", "most_followers", "uniform", "a2b1", "a1b2", "a2b2", "a0.75b0.75")
-
-inf_hist_list <- list()
-row_title_list <- list()
-
-ct <- 3
-criterion <- "sd"
-
-for (i in 1:length(init_cond_list)) {
-  
-  init_cond <- init_cond_list[i]
-  print(paste(i, init_cond))
-  
-  for (sim in 1:5) {
-    
-    result_path <- file.path(box_path, 'HierarchyWisdom', 'results',
-                             paste0('endpool_ct', ct, '_', criterion, '_', init_cond,
-                                    '_alpha_sim', sim, '.csv'))
-    
-    final_state <- read_csv(result_path, col_names = FALSE)
-    
-    inf_hist <- final_state %>% 
-      ggplot(aes(x=X1)) +
-      geom_histogram(bins = 50) +
-      scale_x_continuous(name = "influence", limits = c(0,1)) +
-      theme_classic() +
-      theme(axis.title.y=element_blank(),
-            axis.text.y=element_blank(),
-            axis.ticks.y=element_blank())
-    
-    ind <- (5*(i-1)) + sim
-    inf_hist_list[[ind]] <- inf_hist
-  }
-  
-  row_title <- ggdraw() + 
-    draw_label(
-      init_cond,
-      fontface = 'bold',
-      size = 10,
-      y = 0.5,
-      vjust = 0.5,
-      angle = 90
-    )
-  
-  row_title_list[[i]] <- row_title
-}
-
-plot_grid(row_title_list[[1]], inf_hist_list[[1]], inf_hist_list[[2]], inf_hist_list[[3]], inf_hist_list[[4]], inf_hist_list[[5]],
-          row_title_list[[2]], inf_hist_list[[6]], inf_hist_list[[7]], inf_hist_list[[8]], inf_hist_list[[9]], inf_hist_list[[10]],
-          row_title_list[[3]], inf_hist_list[[11]], inf_hist_list[[12]], inf_hist_list[[13]], inf_hist_list[[14]], inf_hist_list[[15]],
-          row_title_list[[4]], inf_hist_list[[16]], inf_hist_list[[17]], inf_hist_list[[18]], inf_hist_list[[19]], inf_hist_list[[20]],
-          row_title_list[[5]], inf_hist_list[[21]], inf_hist_list[[22]], inf_hist_list[[23]], inf_hist_list[[24]], inf_hist_list[[25]],
-          row_title_list[[6]], inf_hist_list[[26]], inf_hist_list[[27]], inf_hist_list[[28]], inf_hist_list[[29]], inf_hist_list[[30]],
-          row_title_list[[7]], inf_hist_list[[31]], inf_hist_list[[32]], inf_hist_list[[33]], inf_hist_list[[34]], inf_hist_list[[35]],
-          ncol = 6, rel_widths = c(0.1, 1, 1, 1, 1, 1))
-
-ggsave(file.path(wd_result_path,
-                 paste0("end_pool_ct", ct, "_alpha_all.jpg")),
-       height = 8, width = 12)
-
-
-
-
-
-
-# Decision time with discrete leaders (not needed because of focus on group size)
-
-# opf_result_path <- file.path(box_path, 'HierarchyWisdom', 'results', 'replicated_opf_results.csv')
-# opf_result_df <- read_csv(opf_result_path)
+# plot_grid(init_hist_list[[1]], init_hist_list[[2]], init_hist_list[[3]], ncol = 4)
 # 
-# # figure 1a
-# sub_nleads <- c(0, 1, 10)
-# sub_df <- opf_result_df %>% 
-#   filter(nlead %in% sub_nleads)
-# 
-# # aggregate sub_df to calculate sd and average values of each N
-# agg_df <- sub_df %>% 
-#   group_by(N, nlead) %>% 
-#   summarize(avg_t = mean(n_event), sd_t = sd(n_event))
-# 
-# decis_time_plot <- sub_df %>% 
-#   ggplot(aes(x = N, group = nlead, color = as.factor(nlead))) +
-#   geom_point(aes(y = n_event)) +
-#   geom_ribbon(data = agg_df, aes(ymin = avg_t - (2*sd_t),
-#                                  ymax = avg_t + (2*sd_t)),
-#               alpha = .3) +
-#   geom_line(data = agg_df, aes(y = avg_t), linewidth = 1.5) +
-#   scale_y_continuous("Decision time") +
-#   scale_x_continuous("group size") +
-#   guides(color = guide_legend(title = "# of leaders")) +
-#   theme_classic() +
-#   theme(axis.title=element_text(size=16, face="bold"),
-#         axis.text=element_text(size=12),
-#         legend.text = element_text(size=12))
+# ggsave(file.path(wd_result_path,
+#                  "init_distributions.jpg"),
+#        height = 6, width = 12)
+
+
+
 
 
 # Decision time heatmaps
@@ -278,7 +181,7 @@ criterion <- "sd"
 # locations and labels for annotation of beta distributions
 start_x_locs <- 0.5
 start_y_locs <- c(4000, 270, 4000)
-start_labels <- c("Beta(0.1,1.9)", "Beta(1,1)", "Beta(1.9,0.1)")
+start_labels <- c("Beta(1.9,0.1)", "Beta(1,1)", "Beta(0.1,1.9)")
 
 end_x_locs <- c(0.7, 0.3)
 end_y_locs <- c(350, 375, 375, 375, 400, 375)
@@ -329,7 +232,7 @@ for (i in 1:length(init_cond_list)) {
       start_hist <- sliced_states %>% 
         ggplot(aes(x=first_infl)) +
         geom_bar(width = 1) +
-        annotate("text", x=start_x_locs, y=start_y_locs[i], label=start_labels[i], size=4) +
+        # annotate("text", x=start_x_locs, y=start_y_locs[i], label=start_labels[i], size=4) +
         scale_x_binned(breaks = seq(0,1,0.02), expand = c(0.01,0.01)) +
         scale_y_continuous(init_cond_labels[i], expand = c(0,0)) +
         theme_classic() +
@@ -399,50 +302,15 @@ end_col <- ggdraw() +
     angle = 0
   )
 
-# most_lead_row <- ggdraw() + 
-#   draw_label(
-#     "Start with\nmostly leaders",
-#     fontface = 'bold',
-#     size = 12,
-#     y = 0.5,
-#     vjust = 0.5,
-#     angle = 90
-#   )
-# 
-# unif_row <- ggdraw() + 
-#   draw_label(
-#     "Start with\nuniform",
-#     fontface = 'bold',
-#     size = 12,
-#     y = 0.5,
-#     vjust = 0.5,
-#     angle = 90
-#   )
-# 
-# most_fllw_row <- ggdraw() + 
-#   draw_label(
-#     "Start with\nmostly followers",
-#     fontface = 'bold',
-#     size = 12,
-#     y = 0.5,
-#     vjust = 0.5,
-#     angle = 90
-#   )
-
-# plot_grid(NA, start_col, end_col, start_col, end_col,
-#           most_lead_row, inf_hist_list[[1]], inf_hist_list[[2]], inf_hist_list[[3]], inf_hist_list[[4]],
-#           most_fllw_row, inf_hist_list[[5]], inf_hist_list[[6]], inf_hist_list[[7]], inf_hist_list[[8]],
-#           ncol = 5, rel_widths = c(0.1, 1, 1, 1, 1), rel_heights = c(0.1, 1, 1))
-
-
-plot_grid(start_col, end_col, start_col, end_col,
-          inf_hist_list[[1]], inf_hist_list[[2]], inf_hist_list[[3]], inf_hist_list[[4]],
-          inf_hist_list[[5]], inf_hist_list[[6]], inf_hist_list[[7]], inf_hist_list[[8]],
-          inf_hist_list[[9]], inf_hist_list[[10]], inf_hist_list[[11]], inf_hist_list[[12]],
-          ncol = 4, rel_widths = c(1, 0.9, 0.9, 0.9), rel_heights = c(0.15, 1, 1, 1))
+# plot_grid(start_col, end_col, start_col, end_col,
+#           inf_hist_list[[1]], inf_hist_list[[2]], inf_hist_list[[3]], inf_hist_list[[4]],
+#           inf_hist_list[[5]], inf_hist_list[[6]], inf_hist_list[[7]], inf_hist_list[[8]],
+#           inf_hist_list[[9]], inf_hist_list[[10]], inf_hist_list[[11]], inf_hist_list[[12]],
+#           ncol = 4, rel_widths = c(1, 0.9, 0.9, 0.9), rel_heights = c(0.15, 1, 1, 1))
 
 # Equilibrium analysis
 
+# init_cond_list <- c("most_leaders", "most_followers", "uniform")
 init_cond_list <- c("most_leaders", "most_followers", "uniform", "a2b1", "a1b2", "a2b2", "a0.75b0.75")
 
 ct_list <- c(3, -3)
@@ -455,10 +323,12 @@ annotate_df <- data.frame(a = c(0.16, 1.0, 4.0),
                           b = c(4, 0.5, 0.12),
                           text = c("Beta(0.1,1.9)", "Beta(1,1)", "Beta(1.9,0.1)"))
 
+
 segment_df <- data.frame(a = c(0.103, 1.0),
                          b = c(2.08, 0.95),
                          a_end = c(0.15, 1.0),
                          b_end = c(3.55, 0.55))
+
 
 for (c_id in 1:length(criterion_list)) {
   criterion <- criterion_list[c_id]
@@ -517,8 +387,6 @@ for (c_id in 1:length(criterion_list)) {
     # visualize distributions of influence based on beta distribution parameters
     eq_plot <- ggplot(all_beta, aes(x=a, y=b, group=interaction(sim, init_cond))) +
       geom_abline(intercept=0, slope=1, linetype="dashed") +
-      # geom_hline(yintercept = 0, linetype="dashed") +
-      # geom_vline(xintercept = 0, linetype="dashed") +
       geom_path(linewidth=0.2, alpha=0.2) +
       geom_path(data=agg_beta, aes(x=a, y=b, group=init_cond), linewidth=0.75, color='black') +
       geom_point(data=agg_first_last, aes(x=a, y=b, color=position, group=NA), size=2.5, alpha=0.7) +
@@ -551,6 +419,13 @@ for (c_id in 1:length(criterion_list)) {
 # extract shared legend from the first plot
 shared_legend <- get_legend(eq_plot_list[[1]])
 eq_plot1 <- eq_plot_list[[1]] + theme(legend.position = "none")
+
+# ggsave(file.path(wd_result_path, 'Presentation\ materials',
+#                  paste0('global_logba_evo', ct, '_', 'allinitcond',
+#                         '_', criterion, '_allsim_simple', '.png')),
+#        plot = eq_plot_list[[1]],
+#        height = 4, width = 6)
+
 
 # create labels for each column
 column_title_list <- list()
@@ -618,6 +493,117 @@ plot_grid(
 ggsave(file.path(wd_result_path,
                  paste0("diff_organizations_sd.jpg")),
        height = 8, width = 12)
+
+
+
+
+
+
+
+# Skewness across a range of C (speed-quality tradeoff)
+
+init_cond_list <- c("uniform") #c("most_leaders", "uniform", "most_followers")
+
+ct_list <- -3:3
+sim.vector <- 1:5
+criterion <- "sd"
+
+all_beta <- data.frame()
+
+for (i in 1:length(ct_list)) {  
+  
+  ct <- ct_list[i]
+  
+  for (j in 1:length(init_cond_list)) {
+    
+    init_cond <- init_cond_list[j]
+    all_sim_beta <- data.frame()
+    
+    for (k in sim.vector) {
+      global_beta_path <- file.path(box_path, 'HierarchyWisdom', 'results',
+                                    paste0('global_beta_ct', ct, '_',
+                                           criterion, '_', init_cond,
+                                           '_sim', k, '.csv'))
+      global_beta <- read_csv(global_beta_path, show_col_types = FALSE)
+      global_beta$sim <- k
+      all_sim_beta <- rbind(all_sim_beta, global_beta)
+    }
+    
+    all_sim_beta <- all_sim_beta %>%
+      filter(step <= 5000) %>% 
+      mutate(log_a = log(a), log_b = log(b),
+             init_cond = init_cond,
+             ct = ct)
+    
+    all_beta <- rbind(all_beta, all_sim_beta)
+    
+  }
+}
+
+sim_skew <- all_beta %>%
+  mutate(skew = (2*(b - a)*sqrt(a+b+1)) / ((a+b+2)*sqrt(a*b))) %>% 
+  filter(step > 4900, init_cond == "uniform") %>% 
+  group_by(ct, init_cond, sim) %>%
+  summarise(a = mean(a), b = mean(b),
+            log_a = mean(log_a), log_b = mean(log_b),
+            skew = mean(skew))
+
+agg_skew <- sim_skew %>% 
+  group_by(ct, init_cond) %>% 
+  summarise(skew.avg = mean(skew), skew.std = sd(skew), sim_n = n()) %>% 
+  mutate(std_err = skew.std/sqrt(sim_n),
+         ct.factor = as.factor(ct))
+
+# skew_plot <- ggplot(agg_beta, aes(x = ct, y = skew)) +
+#   geom_point() +
+#   theme_classic()
+
+skew_plot <- agg_skew %>% 
+  ggplot(aes(x=ct.factor, y=skew.avg)) +
+  geom_point(alpha=0.7) +
+  geom_errorbar(aes(ymin=skew.avg-(2*std_err),
+                    ymax=skew.avg+(2*std_err)),
+                width=.3) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  scale_y_continuous("Influence Skewness") +
+  theme_classic() +
+  theme(axis.title=element_text(size=16,face="bold"),
+        axis.title.x = element_blank(),
+        axis.text=element_text(size=14),
+        legend.title=element_text(size=16),
+        legend.text = element_text(size=14),
+        legend.position = c(.2, .85),
+        legend.box.background = element_rect(colour = "black"))
+
+
+axis.gg <- ggplot() +
+  annotate("segment", y=0.5,yend=0.5,x=-0.05,xend=3.1,arrow=arrow(type = "closed", ends="both"), linewidth=1.5) +
+  annotate("text", x=c(.6, 1.57, 2.55), y=0.4, angle=0,
+           label = c(expression("Extended deliberation favored"),
+                     "C",
+                     expression("Rapid decision favored")),
+           size = 5.5) +
+  scale_x_continuous(limits = c(-0.15, 3.17), expand = c(0,0)) +
+  scale_y_continuous(limits = c(0.2, 0.57)) +
+  theme_classic() +
+  theme(axis.line = element_blank(),
+        axis.title = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text = element_blank())
+axis.gg
+
+x_axis_panel <- plot_grid(NA, axis.gg, ncol = 2,
+                          rel_widths = c(0.05, 1))
+
+skewness_result_fig <- plot_grid(skew_plot, x_axis_panel, ncol = 1,
+                                 rel_heights = c(1, 0.2))
+
+
+ggsave(file.path(wd_result_path,
+                 paste0("skewness_across_c.jpg")),
+       skewness_result_fig,
+       height = 6, width = 10)
+
 
 
 
@@ -695,16 +681,9 @@ for (c_id in 1:length(criterion_list)) {
       mutate(position = factor(if_else(step == 0, "start", "end"))) %>% 
       mutate(position=fct_relevel(position,c("start","end")))
     
-    # lfirst_steps <- first_steps %>% select(log_a, log_b, position)
-    # llast_steps <- last_steps %>% select(log_a, log_b, position)
-    # 
-    # lglobal_first_last <- rbind(rbind(lfirst_steps, llast_steps), agg_first_last)
-    
     # visualize distributions of influence based on beta distribution parameters
     eq_plot <- ggplot(all_beta, aes(x=a, y=b, group=interaction(sim, init_cond))) +
       geom_abline(intercept=0, slope=1, linetype="dashed") +
-      # geom_hline(yintercept = 0, linetype="dashed") +
-      # geom_vline(xintercept = 0, linetype="dashed") +
       geom_path(linewidth=0.2, alpha=0.2) +
       geom_path(data=agg_beta, aes(x=a, y=b, group=init_cond), linewidth=0.75, color='black') +
       geom_point(data=agg_first_last, aes(x=a, y=b, color=position, group=NA), size=2.5, alpha=0.7) +
@@ -975,118 +954,6 @@ ggsave(file.path(wd_result_path,
 
 
 
-
-
-
-
-# Skewness across a range of C (speed-quality tradeoff)
-
-init_cond_list <- c("uniform") #c("most_leaders", "uniform", "most_followers")
-
-ct_list <- -3:3
-sim.vector <- 1:5
-criterion <- "sd"
-
-all_beta <- data.frame()
-
-for (i in 1:length(ct_list)) {  
-  
-  ct <- ct_list[i]
-  
-  for (j in 1:length(init_cond_list)) {
-    
-    init_cond <- init_cond_list[j]
-    all_sim_beta <- data.frame()
-    
-    for (k in sim.vector) {
-      global_beta_path <- file.path(box_path, 'HierarchyWisdom', 'results',
-                                    paste0('global_beta_ct', ct, '_',
-                                           criterion, '_', init_cond,
-                                           '_sim', k, '.csv'))
-      global_beta <- read_csv(global_beta_path, show_col_types = FALSE)
-      global_beta$sim <- k
-      all_sim_beta <- rbind(all_sim_beta, global_beta)
-    }
-    
-    all_sim_beta <- all_sim_beta %>%
-      filter(step <= 5000) %>% 
-      mutate(log_a = log(a), log_b = log(b),
-             init_cond = init_cond,
-             ct = ct)
-    
-    all_beta <- rbind(all_beta, all_sim_beta)
-    
-  }
-}
-
-sim_skew <- all_beta %>%
-  mutate(skew = (2*(b - a)*sqrt(a+b+1)) / ((a+b+2)*sqrt(a*b))) %>% 
-  filter(step > 4900, init_cond == "uniform") %>% 
-  group_by(ct, init_cond, sim) %>%
-  summarise(a = mean(a), b = mean(b),
-            log_a = mean(log_a), log_b = mean(log_b),
-            skew = mean(skew))
-
-agg_skew <- sim_skew %>% 
-  group_by(ct, init_cond) %>% 
-  summarise(skew.avg = mean(skew), skew.std = sd(skew), sim_n = n()) %>% 
-  mutate(std_err = skew.std/sqrt(sim_n),
-         ct.factor = as.factor(ct))
-
-# skew_plot <- ggplot(agg_beta, aes(x = ct, y = skew)) +
-#   geom_point() +
-#   theme_classic()
-
-skew_plot <- agg_skew %>% 
-  ggplot(aes(x=ct.factor, y=skew.avg)) +
-  geom_point(alpha=0.7) +
-  geom_errorbar(aes(ymin=skew.avg-(2*std_err),
-                    ymax=skew.avg+(2*std_err)),
-                width=.3) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  # scale_x_discrete("C") +
-  scale_y_continuous("Influence Skewness") +
-  # scale_color_manual(labels = c("Most Followers", "Most Leaders", "Uniform"),
-  #                    values = c("#F8766D", "#7CAE00", "#00BFC4")) +
-  # guides(colour = guide_legend(title = "Initial Condition")) +
-  theme_classic() +
-  theme(axis.title=element_text(size=16,face="bold"),
-        axis.title.x = element_blank(),
-        axis.text=element_text(size=14),
-        legend.title=element_text(size=16),
-        legend.text = element_text(size=14),
-        legend.position = c(.2, .85),
-        legend.box.background = element_rect(colour = "black"))
-
-
-axis.gg <- ggplot() +
-  annotate("segment", y=0.5,yend=0.5,x=-0.05,xend=3.1,arrow=arrow(type = "closed", ends="both"), linewidth=1.5) +
-  # annotate("segment", x=c(.5, 1.5, 2.5),xend=c(.5, 1.5, 2.5),y=.49,yend=.51) +
-  annotate("text", x=c(.6, 1.57, 2.55), y=0.4, angle=0,
-           label = c(expression("Extended deliberation favored"),
-                     "C",
-                     expression("Rapid decision favored")),
-           size = 5.5) +
-  scale_x_continuous(limits = c(-0.15, 3.17), expand = c(0,0)) +
-  scale_y_continuous(limits = c(0.2, 0.57)) +
-  theme_classic() +
-  theme(axis.line = element_blank(),
-        axis.title = element_blank(),
-        axis.ticks = element_blank(),
-        axis.text = element_blank())
-axis.gg
-
-x_axis_panel <- plot_grid(NA, axis.gg, ncol = 2,
-                          rel_widths = c(0.05, 1))
-
-skewness_result_fig <- plot_grid(skew_plot, x_axis_panel, ncol = 1,
-                                 rel_heights = c(1, 0.2))
-
-
-ggsave(file.path(wd_result_path,
-                 paste0("skewness_across_c.jpg")),
-       skewness_result_fig,
-       height = 6, width = 10)
 
 
 
@@ -1469,6 +1336,7 @@ beta_ab_df <- beta_ab_df %>%
 
 max_var <- max(beta_ab_df$beta.var)
 mid_var <- median(beta_ab_df$beta.var)
+# min(beta_ab_df$beta.var)
 
 colors <- c("blue", "white", "red")
 color_breaks <- c(0, mid_var, max_var)

@@ -132,7 +132,6 @@ if __name__ == '__main__':
                     alpha_sep_hists.append(alpha_hist)
 
 
-
         if consensus_dist: # tracking distance to consensus for model investigation
             tmp_cd = pd.DataFrame({'alpha': alpha_pool, 'con_dist': cd_pool, 'mv_dist': mv_pool, 'step': i})
             tmp_cd['alpha_bin'] = tmp_cd['alpha'].map(lambda alpha: int(np.floor(alpha / 0.1)) if alpha != 1 else 9)
@@ -146,9 +145,12 @@ if __name__ == '__main__':
             tmp_agg_w.columns = ['alpha_bin', 'avg_w', 'n', 'step']
             cum_w_pool.append(tmp_agg_w)
 
+
         if fixed_popsize == "all_groups":
+            # store raw alpha values of individuals when group sizes are the same across all groups
             alpha_pool_hists.append(np.array(alpha_pool))
         else:
+            # Convert alpha values of individuals to histograms when group sizes vary between groups
             alpha_hist = np.histogram(np.array(alpha_pool), bins=50, range=(0, 1))[0]
             alpha_hist = alpha_hist / np.sum(alpha_hist)
             alpha_pool_hists.append(alpha_hist)
@@ -181,6 +183,7 @@ if __name__ == '__main__':
     with open(os.path.join(result_path, filename), 'wb') as file:
         np.save(file, np.array(alpha_pool_hists))
 
+
     if consensus_dist:
         cum_cd_df = pd.concat(cum_cd_pool).reset_index(drop=True)
         print(cum_cd_df.head())
@@ -197,6 +200,7 @@ if __name__ == '__main__':
                                                          crit_abbv, sim_num)
         result_file = os.path.join(result_path, filename)
         cum_w_df.to_csv(result_file, index=False)
+
 
     # retrieve model-level results
     community_data = pd.DataFrame(evo_model.datacollector)

@@ -27,7 +27,7 @@ class OpinionAgent():
 
 class Community():
     """
-    A community of opinion agents that try to reach a consensus to produce payoffs
+    A community of opinion agents that try to reach a consensus and receive payoffs
 
     unique_id: ID of the community
     model: evolutionary model super class that stores all parameters
@@ -118,6 +118,11 @@ class Community():
         return speak_probs
 
     def final_decision(self):
+        '''
+        Calculating final decision once the collective decision is reached.
+
+        :return: final decision value (double)
+        '''
         if self.criterion == 'sd_threshold':
             return np.mean([agent.opinion for agent in self.population])
         elif self.criterion == 'prop_threshold':
@@ -360,12 +365,16 @@ class EvoOpinionModel():
         this parameter was set to 0 in the simulations for the paper but
         interested readers can set this to positive value [0,1] to explore the mechanism.
     b_mid: group size at the sigmoid's midpoint (sigmoid parameter)
-    Ct: time constraints on group consensus building
+    Ct: determinant of speed-quality tradeoff in collective decision-making processes
+         generally a real number parameter, but
+         some keywords simulate scenarios where groups face different tradeoffs ("even", "most_fast", "most_slow")
     q: ecological inequality
     m: migration rate
     dr: death rate
     criterion: decision rule for the groups (either based on sd threshold or proportional threshold)
     init_cond: initial conditions for distribution of influence among agents
+    lead_type: whether high-influence agents are persuasive
+    lead_clust: whether the opinion of high-inflence agents are clustered together
     load_communities: a set of communities provided to the model in a scenario
         where user wants to resume the simulation
     """
@@ -490,6 +499,15 @@ class EvoOpinionModel():
 
     # Model time step
     def step(self, fixed_pop=False, verbose=False, process_num=1):
+        '''
+        Simulate one evolutionary time step that consists of forming decisions, payoff distribution,
+        removal & reproduction, and migration.
+
+        :param fixed_pop: boolean indicating whether total population size is constant
+        :param verbose: boolean indicating whether to print the simulation progress
+        :param process_num: integers indicating the number of parallel processes of the model
+        :return: None
+        '''
 
         self.form_decision(verbose=verbose, process_num=process_num)
         self.step_count += 1

@@ -1,23 +1,33 @@
-result_path: '/Users/chanuwasaswamenakul/Library/CloudStorage/Box-Box/HierarchyWisdom/results'
-start_gen: 1
-iter_num: 10
+result_path: 'results'
+start_gen: 0
+iter_num: 100
 sim_num: 1
+sephist_step: 1
+consensus_dist: False
+track_fitness: False
+fixed_popsize: 'all_groups'
 fixed_params:
-  init_n: 50
+  init_n: 500
   x_threshold: 0.05
   k: 4
+  lim_speakers: 1
   lim_listeners: 30
-  np: 50
+  ng: 1
   mu_rate: 0.01
-  alpha_var: 0.01
+  alpha_var: 0.0025
   K: 50
-  ra: 2
-  gammar: 0.025
-  betar: 3
+  ra: 0.1
+  gammar: 0.05
+  betar: 5
   gammab: 0.005
-  betab: 10000
-  S: 0.9
-  b_mid: 500
-  Ct: 2
-  d: 1
+  betab: 5000
+  S: 0
+  b_mid: 100
+  Ct: 3
+  q: 0.1
   m: 0.05
+  dr: 0.1
+  criterion: 'sd_threshold'
+  init_cond: 'right_skew'
+  lead_type: 'persuasive'
+  lead_clust: False

@@ -1,2 +1,2 @@
-# Social Structure Trade-offs
-A modeling project that explores two contrasting accounts of collective decision-making: Hierarchical structure can accelerate decision-making processes ignoring decision quality while egalitarian structure may prolong decision-making process allowing groups to discover better decisions.
+# Speed-Quality Tradeoffs Shape the Structure of Decision-Making Collectives
+When should we expect groups with different social structure? Hierarchical structure is often understood to be emerging to promote efficiency in collective decision-making. However, groups can often do better by taking more time to explore a problem space or generate ideas. Simulations of an evolutionary model of group decision-making that includes both within-group and between-group dynamics find hierarchy emerges when collective decisions need to be made quickly, but more egalitarian institutions evolve when careful deliberation is more important.
